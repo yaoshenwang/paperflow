@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { users, organizations } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * POST /api/auth — 简单认证
@@ -81,6 +82,7 @@ async function handleRegister(params: {
     name: user.name,
     role: user.role,
     orgId: user.orgId,
+    orgName: params.orgName ?? null,
   }, { status: 201 })
 }
 
@@ -114,14 +116,7 @@ async function handleLogout() {
 }
 
 async function handleMe() {
-  const cookieStore = await cookies()
-  const userId = cookieStore.get('pf-user-id')?.value
-
-  if (!userId) {
-    return Response.json({ user: null })
-  }
-
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  const user = await getCurrentUser()
   if (!user) {
     return Response.json({ user: null })
   }
@@ -133,6 +128,7 @@ async function handleMe() {
       name: user.name,
       role: user.role,
       orgId: user.orgId,
+      orgName: user.orgName,
     },
   })
 }

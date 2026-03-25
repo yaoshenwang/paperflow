@@ -21,6 +21,7 @@ export function Inspector() {
     refreshPreview,
   } = usePaperStore()
   const [exporting, setExporting] = useState<ExportFormat | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const selectedClip = clips.find((clip) => clip.id === selectedClipId)
   const selectedItem = selectedClip ? itemSummaries[selectedClip.questionItemId] : null
@@ -28,6 +29,7 @@ export function Inspector() {
 
   const exportPaper = async (format: ExportFormat) => {
     setExporting(format)
+    setExportError(null)
     try {
       const response = await fetch('/api/export', {
         method: 'POST',
@@ -41,7 +43,11 @@ export function Inspector() {
         }),
       })
 
-      if (!response.ok) return
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        setExportError(data?.error ?? '导出失败，请稍后重试。')
+        return
+      }
 
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
@@ -138,6 +144,11 @@ export function Inspector() {
               <span className="text-xs text-zinc-400">{exporting === 'json' ? '处理中...' : '结构化数据'}</span>
             </button>
           </div>
+          {exportError ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-950/30 dark:text-red-300">
+              {exportError}
+            </p>
+          ) : null}
         </section>
 
         <section className="space-y-3 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">

@@ -4,6 +4,8 @@ import { questionItems } from '@/db/schema'
 import { sql } from 'drizzle-orm'
 import { renderToTypst } from '@paperflow/render-typst'
 import type { PaperProject, QuestionItem, OutputMode } from '@paperflow/schema'
+import { getCurrentUser, hasPermission } from '@/lib/auth'
+import { FORMAL_RIGHTS_STATUSES, PUBLIC_REVIEW_STATUSES } from '@/lib/library-access'
 
 /**
  * POST /api/export — 导出试卷
@@ -13,6 +15,14 @@ import type { PaperProject, QuestionItem, OutputMode } from '@paperflow/schema'
  * Mode: student, teacher, answer_sheet, solution_book
  */
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return Response.json({ error: 'Authentication required' }, { status: 401 })
+  }
+  if (!hasPermission(user.role, 'papers:export')) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const body = await request.json()
   const { title, sections, clips, format = 'pdf', mode = 'student' } = body
 
@@ -25,6 +35,23 @@ export async function POST(request: NextRequest) {
   const items = await db.select().from(questionItems).where(
     sql`${questionItems.id} = ANY(${itemIds})`,
   )
+
+  if (items.length !== itemIds.length) {
+    return Response.json({ error: 'Some question items were not found' }, { status: 404 })
+  }
+
+  const invalidItems = items.filter(
+    (item) =>
+      !PUBLIC_REVIEW_STATUSES.includes(item.reviewStatus as typeof PUBLIC_REVIEW_STATUSES[number]) ||
+      !FORMAL_RIGHTS_STATUSES.includes(item.rightsStatus as typeof FORMAL_RIGHTS_STATUSES[number]),
+  )
+
+  if (invalidItems.length > 0) {
+    return Response.json({
+      error: '试卷包含未审核或版权状态不合规的题目，无法正式导出',
+      invalidItemIds: invalidItems.map((item) => item.id),
+    }, { status: 403 })
+  }
 
   const paper = buildPaperProject(title, sections, clips, mode)
   const questionItemsForRender = items.map(rowToQuestionItem)

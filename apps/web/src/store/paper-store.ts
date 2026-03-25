@@ -33,6 +33,7 @@ export type QuestionItemSummary = {
   sourceLabel: string
   reviewStatus: string
   contentPreview: string
+  libraryScope: 'public' | 'school'
 }
 
 export type PaperState = {
@@ -70,7 +71,7 @@ export type PaperState = {
 
   selectClip: (clipId: string | null) => void
 
-  searchItems: (query: string) => Promise<void>
+  searchItems: (query: string, options?: { scope?: 'public' | 'school' | 'all' }) => Promise<void>
   refreshPreview: () => Promise<void>
 }
 
@@ -255,11 +256,12 @@ export const usePaperStore = create<PaperState>((set, get) => ({
 
   selectClip: (clipId) => set({ selectedClipId: clipId }),
 
-  searchItems: async (query) => {
+  searchItems: async (query, options) => {
     set({ searchLoading: true })
     try {
       const params = new URLSearchParams()
       if (query) params.set('q', query)
+      if (options?.scope) params.set('scope', options.scope)
       params.set('limit', '50')
       const res = await fetch(`/api/items?${params}`)
       const data = await res.json()
@@ -272,6 +274,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         sourceLabel: item.sourceLabel,
         reviewStatus: item.reviewStatus,
         contentPreview: item.searchText || '',
+        libraryScope: item.libraryScope === 'school' ? 'school' : 'public',
       }))
       set((state) => ({
         searchResults: items,

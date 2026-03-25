@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { users } from '@/db/schema'
+import { organizations, users } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 
@@ -10,6 +10,7 @@ export type SessionUser = {
   email: string
   name: string
   orgId: string | null
+  orgName: string | null
   role: UserRole
 }
 
@@ -18,6 +19,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<string>> = {
   teacher: new Set([
     'items:read',
     'items:create',
+    'source_documents:create',
     'papers:read',
     'papers:create',
     'papers:edit_own',
@@ -28,6 +30,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<string>> = {
     'items:read',
     'items:create',
     'items:review',
+    'source_documents:create',
     'papers:read',
     'papers:create',
     'papers:edit_own',
@@ -40,11 +43,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<string>> = {
     'items:edit',
     'items:review',
     'items:delete',
+    'items:manage_rights',
     'items:import',
     'papers:read',
     'papers:create',
     'papers:edit_own',
     'papers:export',
+    'source_documents:create',
     'source_documents:manage',
     'search',
   ]),
@@ -54,11 +59,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Set<string>> = {
     'items:edit',
     'items:review',
     'items:delete',
+    'items:manage_rights',
     'items:import',
     'papers:read',
     'papers:create',
     'papers:edit',
     'papers:export',
+    'source_documents:create',
     'source_documents:manage',
     'users:manage',
     'org:manage',
@@ -86,11 +93,23 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
   if (!user) return null
 
+  const [org] = user.orgId
+    ? await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, user.orgId))
+        .limit(1)
+    : []
+
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     orgId: user.orgId,
+    orgName: org?.name ?? null,
     role: user.role as UserRole,
   }
 }
