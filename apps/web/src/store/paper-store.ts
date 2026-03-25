@@ -64,6 +64,7 @@ export type PaperState = {
   reorderClips: (sectionId: string, clipIds: string[]) => void
   updateClipScore: (clipId: string, score: number) => void
   toggleClipLock: (clipId: string) => void
+  moveClipInSection: (clipId: string, direction: 'up' | 'down') => void
 
   selectClip: (clipId: string | null) => void
 
@@ -157,6 +158,38 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         c.id === clipId ? { ...c, locked: !c.locked } : c,
       ),
     }))
+  },
+
+  moveClipInSection: (clipId, direction) => {
+    set((s) => {
+      const current = s.clips.find((clip) => clip.id === clipId)
+      if (!current) return s
+
+      const sectionClips = s.clips
+        .filter((clip) => clip.sectionId === current.sectionId)
+        .sort((a, b) => a.order - b.order)
+
+      const currentIndex = sectionClips.findIndex((clip) => clip.id === clipId)
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= sectionClips.length) {
+        return s
+      }
+
+      const reordered = [...sectionClips]
+      const [moved] = reordered.splice(currentIndex, 1)
+      reordered.splice(targetIndex, 0, moved)
+
+      const orderMap = new Map(reordered.map((clip, index) => [clip.id, index]))
+
+      return {
+        clips: s.clips.map((clip) =>
+          clip.sectionId === current.sectionId
+            ? { ...clip, order: orderMap.get(clip.id) ?? clip.order }
+            : clip,
+        ),
+      }
+    })
   },
 
   selectClip: (clipId) => set({ selectedClipId: clipId }),

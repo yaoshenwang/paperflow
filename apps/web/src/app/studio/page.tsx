@@ -7,41 +7,37 @@ import { Inspector } from '@/components/inspector/Inspector'
 
 export default function StudioPage() {
   return (
-    <div className="flex h-screen flex-col bg-zinc-50 dark:bg-black">
-      {/* Top bar */}
-      <header className="flex h-10 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-blue-600">Paperflow</span>
-          <span className="text-xs text-zinc-400">Studio</span>
+    <div className="flex h-screen flex-col bg-zinc-100 dark:bg-black">
+      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-5 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-blue-600">Paperflow</span>
+            <span className="text-xs text-zinc-400">组卷工作台</span>
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">从题库选题，整理成试卷，预览后导出。</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="rounded bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700">
-            导出
-          </button>
+          <div className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-500 dark:bg-zinc-900 dark:text-zinc-300">
+            左侧选题，中间组卷，右侧导出
+          </div>
         </div>
       </header>
 
-      {/* Main area: SourceBin | Viewer | Inspector */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Source Bin */}
-        <div className="w-72 shrink-0">
+      <div className="grid flex-1 grid-cols-[320px_minmax(0,1fr)_360px] overflow-hidden">
+        <div className="min-w-0">
           <SourceBin />
         </div>
 
-        {/* Center: Viewer */}
-        <div className="flex-1">
-          <Viewer />
+        <div className="grid min-w-0 grid-rows-[minmax(0,1fr)_360px] overflow-hidden border-l border-r border-zinc-200 dark:border-zinc-800">
+          <Timeline />
+          <div className="border-t border-zinc-200 dark:border-zinc-800">
+            <Viewer />
+          </div>
         </div>
 
-        {/* Right: Inspector */}
-        <div className="w-72 shrink-0">
+        <div className="min-w-0">
           <Inspector />
         </div>
-      </div>
-
-      {/* Bottom: Timeline */}
-      <div className="h-52 shrink-0">
-        <Timeline />
       </div>
     </div>
   )

@@ -20,6 +20,15 @@ export function SourceBin() {
   const [query, setQuery] = useState('')
   const { searchResults, searchLoading, searchItems, addClip, sections } = usePaperStore()
 
+  const getDefaultSectionId = (questionType: string) => {
+    const section =
+      (questionType.includes('choice') && sections.find((sec) => sec.title.includes('选择'))) ||
+      (questionType === 'fill_blank' && sections.find((sec) => sec.title.includes('填空'))) ||
+      sections[sections.length - 1]
+
+    return section?.id
+  }
+
   const handleSearch = () => {
     searchItems(query)
   }
@@ -27,7 +36,8 @@ export function SourceBin() {
   return (
     <div className="flex h-full flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <div className="border-b border-zinc-200 p-3 dark:border-zinc-800">
-        <h2 className="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">素材库</h2>
+        <h2 className="mb-1 text-sm font-semibold text-zinc-700 dark:text-zinc-300">题库</h2>
+        <p className="mb-3 text-xs text-zinc-400">搜索题目，点击加入试卷。</p>
         <div className="flex gap-1">
           <input
             type="text"
@@ -49,7 +59,7 @@ export function SourceBin() {
 
       <div className="flex-1 overflow-y-auto p-2">
         {searchResults.length === 0 && !searchLoading && (
-          <p className="p-4 text-center text-sm text-zinc-400">搜索题目以添加到试卷</p>
+          <p className="p-4 text-center text-sm text-zinc-400">搜索题目后从这里加入试卷</p>
         )}
         {searchResults.map((item) => (
           <div
@@ -69,18 +79,16 @@ export function SourceBin() {
             </p>
             <div className="flex items-center justify-between">
               <span className="text-xs text-zinc-400">{item.sourceLabel}</span>
-              <div className="flex gap-1">
-                {sections.map((sec) => (
-                  <button
-                    key={sec.id}
-                    onClick={() => addClip(sec.id, item, 5)}
-                    title={`添加到 ${sec.title}`}
-                    className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300"
-                  >
-                    <Plus className="inline h-3 w-3" /> {sec.title.slice(0, 4)}
-                  </button>
-                ))}
-              </div>
+              <button
+                onClick={() => {
+                  const sectionId = getDefaultSectionId(item.questionType)
+                  if (sectionId) addClip(sectionId, item, 5)
+                }}
+                className="rounded bg-green-100 px-2 py-1 text-xs text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300"
+              >
+                <Plus className="mr-1 inline h-3 w-3" />
+                加入试卷
+              </button>
             </div>
           </div>
         ))}
