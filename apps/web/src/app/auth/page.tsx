@@ -4,12 +4,28 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+const ROLE_OPTIONS = [
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'reviewer', label: 'Reviewer' },
+  { value: 'librarian', label: 'Librarian' },
+  { value: 'org_admin', label: 'Org Admin' },
+] as const
+
 type SessionUser = {
   id: string
   name: string
   email: string
   role: string
+  orgId: string | null
   orgName: string | null
+}
+
+type OrgMember = {
+  id: string
+  email: string
+  name: string
+  role: string
+  createdAt: string
 }
 
 export default function AuthPage() {
@@ -18,12 +34,33 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [user, setUser] = useState<SessionUser | null>(null)
+  const [members, setMembers] = useState<OrgMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [membersMessage, setMembersMessage] = useState<string | null>(null)
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null)
   const [form, setForm] = useState({
     email: '',
     password: '',
     name: '',
     orgName: '',
   })
+
+  const loadMembers = async () => {
+    setMembersLoading(true)
+    setMembersMessage(null)
+    try {
+      const response = await fetch('/api/org/members')
+      const data = await response.json()
+      if (!response.ok) {
+        setMembers([])
+        setMembersMessage(data.error ?? '成员信息读取失败')
+        return
+      }
+      setMembers(data.members ?? [])
+    } finally {
+      setMembersLoading(false)
+    }
+  }
 
   useEffect(() => {
     const loadMe = async () => {
@@ -38,6 +75,15 @@ export default function AuthPage() {
 
     loadMe()
   }, [])
+
+  useEffect(() => {
+    if (user?.role === 'org_admin' && user.orgId) {
+      loadMembers()
+    } else {
+      setMembers([])
+      setMembersMessage(null)
+    }
+  }, [user?.orgId, user?.role])
 
   const submit = async () => {
     setLoading(true)
@@ -87,6 +133,38 @@ export default function AuthPage() {
     setMessage('已退出登录')
   }
 
+  const updateMemberRole = async (memberId: string, role: string) => {
+    setUpdatingMemberId(memberId)
+    setMembersMessage(null)
+    try {
+      const response = await fetch('/api/org/members', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: memberId, role }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setMembersMessage(data.error ?? '成员角色更新失败')
+        return
+      }
+
+      setMembers((current) =>
+        current.map((member) =>
+          member.id === memberId ? { ...member, role: data.member.role } : member,
+        ),
+      )
+
+      if (user?.id === memberId) {
+        setUser((current) => (current ? { ...current, role: data.member.role } : current))
+      }
+
+      setMembersMessage('成员角色已更新')
+    } finally {
+      setUpdatingMemberId(null)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-zinc-100 px-4 py-10 dark:bg-black">
       <div className="mx-auto max-w-5xl rounded-[32px] border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
@@ -120,7 +198,7 @@ export default function AuthPage() {
 
           <section className="p-8">
             {user ? (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 <div>
                   <p className="text-sm text-zinc-400">当前会话</p>
                   <h2 className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{user.name}</h2>
@@ -146,6 +224,69 @@ export default function AuthPage() {
                 </div>
 
                 {message ? <p className="text-sm text-zinc-500">{message}</p> : null}
+
+                {user.role === 'org_admin' && user.orgId ? (
+                  <div className="space-y-4 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-zinc-400">组织成员</p>
+                        <h3 className="mt-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                          {user.orgName || '当前组织'}
+                        </h3>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          同一组织成员可通过注册时填写相同组织名称加入；这里可直接调整成员角色。
+                        </p>
+                      </div>
+                      <button
+                        onClick={loadMembers}
+                        disabled={membersLoading}
+                        className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                      >
+                        {membersLoading ? '刷新中...' : '刷新成员'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {members.map((member) => (
+                        <div
+                          key={member.id}
+                          className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900/60"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {member.name}
+                                {member.id === user.id ? '（当前账号）' : ''}
+                              </p>
+                              <p className="mt-1 text-xs text-zinc-500">{member.email}</p>
+                            </div>
+
+                            <select
+                              value={member.role}
+                              onChange={(event) => updateMemberRole(member.id, event.target.value)}
+                              disabled={updatingMemberId === member.id}
+                              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                            >
+                              {ROLE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+
+                      {members.length === 0 && !membersLoading ? (
+                        <p className="text-sm text-zinc-500">当前组织还没有其他成员。</p>
+                      ) : null}
+                    </div>
+
+                    {membersMessage ? (
+                      <p className="text-sm text-zinc-500">{membersMessage}</p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-5">
