@@ -196,14 +196,14 @@ async function handleCheckBalance(params: {
 
 /** 推荐替换题目 */
 async function handleSuggestReplace(params: {
-  clipItemId: string
+  questionItemId: string
   reason?: string
 }) {
   // 获取原题信息
   const [original] = await db
     .select()
     .from(questionItems)
-    .where(eq(questionItems.id, params.clipItemId))
+    .where(eq(questionItems.id, params.questionItemId))
     .limit(1)
 
   if (!original) {

@@ -77,6 +77,20 @@ export function renderToDocxXml(
         }
       }
 
+      // 小问
+      if (item.content.subquestions) {
+        for (const sub of item.content.subquestions) {
+          const subStem = sub.stem.map(blockToText).join('\n')
+          paragraphs.push(docxParagraph(`    (${sub.order}) ${subStem}`))
+          if (showAnswers && !clip.hiddenParts.includes('answer') && sub.answer) {
+            paragraphs.push(docxParagraph(`    【答案】${sub.answer.map(blockToText).join('\n')}`, { bold: true }))
+          }
+          if (showAnswers && !clip.hiddenParts.includes('analysis') && sub.analysis) {
+            paragraphs.push(docxParagraph(`    【解析】${sub.analysis.map(blockToText).join('\n')}`))
+          }
+        }
+      }
+
       // 答案
       if (showAnswers && !clip.hiddenParts.includes('answer') && item.content.answer) {
         const answerText = item.content.answer.map(blockToText).join('\n')

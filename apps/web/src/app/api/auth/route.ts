@@ -47,14 +47,18 @@ async function handleRegister(params: {
 
   let orgId: string | null = null
   if (params.orgName) {
-    const [org] = await db
-      .insert(organizations)
-      .values({
-        name: params.orgName,
-        slug: params.orgName.toLowerCase().replace(/\s+/g, '-'),
-      })
-      .returning()
-    orgId = org.id
+    const slug = params.orgName.toLowerCase().replace(/\s+/g, '-')
+    // 先查找已有组织
+    const [existing] = await db.select().from(organizations).where(eq(organizations.slug, slug)).limit(1)
+    if (existing) {
+      orgId = existing.id
+    } else {
+      const [org] = await db
+        .insert(organizations)
+        .values({ name: params.orgName, slug })
+        .returning()
+      orgId = org.id
+    }
   }
 
   const [user] = await db

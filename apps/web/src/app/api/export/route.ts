@@ -66,9 +66,12 @@ export async function POST(request: NextRequest) {
     }
 
     case 'qti': {
-      const { renderTestToQti } = await import('@paperflow/render-qti')
-      const qtiXml = renderTestToQti(paper, questionItemsForRender)
-      return new Response(qtiXml, {
+      const { renderTestToQti, renderItemToQti } = await import('@paperflow/render-qti')
+      // 生成自包含的 QTI 包：test XML + 所有 item XML 拼接
+      const testXml = renderTestToQti(paper, questionItemsForRender)
+      const itemXmls = questionItemsForRender.map((item) => renderItemToQti(item))
+      const combined = `<!-- QTI Assessment Test -->\n${testXml}\n\n<!-- Assessment Items -->\n${itemXmls.join('\n\n')}`
+      return new Response(combined, {
         headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${title}-qti.xml"` },
       })
     }
