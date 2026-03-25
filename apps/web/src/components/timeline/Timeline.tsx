@@ -3,15 +3,29 @@
 import { usePaperStore } from '@/store/paper-store'
 import { ArrowDown, ArrowUp, Lock, Unlock, Trash2, FileText } from 'lucide-react'
 
+const TYPE_LABELS: Record<string, string> = {
+  single_choice: '单选',
+  multiple_choice: '多选',
+  fill_blank: '填空',
+  short_answer: '简答',
+  computation: '计算',
+  proof: '证明',
+  essay: '论述',
+  true_false: '判断',
+  composite: '综合',
+}
+
 export function Timeline() {
   const {
     sections,
     clips,
+    itemSummaries,
     selectedClipId,
     selectClip,
     removeClip,
     toggleClipLock,
     updateClipScore,
+    updateClipSection,
     moveClipInSection,
   } = usePaperStore()
 
@@ -58,85 +72,125 @@ export function Timeline() {
                         从左侧题库加入题目
                       </div>
                     ) : (
-                      sectionClips.map((clip, index) => (
-                        <div
-                          key={clip.id}
-                          onClick={() => selectClip(clip.id)}
-                          className={`rounded-xl border p-4 transition-colors ${
-                            selectedClipId === clip.id
-                              ? 'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-950/20'
-                              : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
-                                  第 {index + 1} 题
-                                </span>
-                                <span className="text-xs text-zinc-400">{clip.questionItemId}</span>
-                              </div>
-                              <p className="mt-2 text-sm text-zinc-500">
-                                题目已加入该分区。可在右侧调整标题、预览与导出，或在此处修改顺序和分值。
-                              </p>
-                            </div>
+                      sectionClips.map((clip, index) => {
+                        const item = itemSummaries[clip.questionItemId]
 
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  moveClipInSection(clip.id, 'up')
-                                }}
-                                className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                                title="上移"
-                              >
-                                <ArrowUp className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  moveClipInSection(clip.id, 'down')
-                                }}
-                                className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                                title="下移"
-                              >
-                                <ArrowDown className="h-4 w-4" />
-                              </button>
-                              <input
-                                type="number"
-                                value={clip.score}
-                                onChange={(event) => updateClipScore(clip.id, Number(event.target.value) || 0)}
-                                onClick={(event) => event.stopPropagation()}
-                                className="w-16 rounded border border-zinc-300 px-2 py-2 text-center text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                              />
-                              <button
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  toggleClipLock(clip.id)
-                                }}
-                                className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                                title={clip.locked ? '解锁题目' : '锁定题目'}
-                              >
-                                {clip.locked ? (
-                                  <Lock className="h-4 w-4 text-amber-500" />
-                                ) : (
-                                  <Unlock className="h-4 w-4" />
-                                )}
-                              </button>
-                              <button
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  removeClip(clip.id)
-                                }}
-                                className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:hover:bg-red-950/20"
-                                title="删除题目"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                        return (
+                          <article
+                            key={clip.id}
+                            onClick={() => selectClip(clip.id)}
+                            className={`rounded-xl border p-4 transition-colors ${
+                              selectedClipId === clip.id
+                                ? 'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-950/20'
+                                : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+                                    第 {index + 1} 题
+                                  </span>
+                                  {item ? (
+                                    <>
+                                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                        {TYPE_LABELS[item.questionType] ?? item.questionType}
+                                      </span>
+                                      <span className="text-xs text-zinc-400">
+                                        {item.subject} / {item.grade}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-zinc-400">{clip.questionItemId}</span>
+                                  )}
+                                </div>
+
+                                <p className="mt-2 line-clamp-3 text-sm text-zinc-700 dark:text-zinc-300">
+                                  {item?.contentPreview || '题目已加入该分区。可在此处调整顺序、分值和分区。'}
+                                </p>
+
+                                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                                  <span>{item?.sourceLabel || '未记录来源'}</span>
+                                  {item?.reviewStatus ? <span>审核状态：{item.reviewStatus}</span> : null}
+                                  {item?.difficulty != null ? (
+                                    <span>难度 {(item.difficulty * 10).toFixed(0)}/10</span>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                <select
+                                  value={clip.sectionId}
+                                  onChange={(event) => updateClipSection(clip.id, event.target.value)}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="rounded border border-zinc-300 px-2 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                                  aria-label="调整分区"
+                                >
+                                  {sections
+                                    .slice()
+                                    .sort((a, b) => a.order - b.order)
+                                    .map((targetSection) => (
+                                      <option key={targetSection.id} value={targetSection.id}>
+                                        {targetSection.title}
+                                      </option>
+                                    ))}
+                                </select>
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    moveClipInSection(clip.id, 'up')
+                                  }}
+                                  className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                                  title="上移"
+                                >
+                                  <ArrowUp className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    moveClipInSection(clip.id, 'down')
+                                  }}
+                                  className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                                  title="下移"
+                                >
+                                  <ArrowDown className="h-4 w-4" />
+                                </button>
+                                <input
+                                  type="number"
+                                  value={clip.score}
+                                  onChange={(event) => updateClipScore(clip.id, Number(event.target.value) || 0)}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="w-16 rounded border border-zinc-300 px-2 py-2 text-center text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                                />
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    toggleClipLock(clip.id)
+                                  }}
+                                  className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                                  title={clip.locked ? '解锁题目' : '锁定题目'}
+                                >
+                                  {clip.locked ? (
+                                    <Lock className="h-4 w-4 text-amber-500" />
+                                  ) : (
+                                    <Unlock className="h-4 w-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    removeClip(clip.id)
+                                  }}
+                                  className="rounded border border-zinc-200 p-2 text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:hover:bg-red-950/20"
+                                  title="删除题目"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ))
+                          </article>
+                        )
+                      })
                     )}
                   </div>
                 </section>

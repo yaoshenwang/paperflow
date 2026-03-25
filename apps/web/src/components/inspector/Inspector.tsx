@@ -12,8 +12,10 @@ export function Inspector() {
     setTitle,
     sections,
     clips,
+    itemSummaries,
     selectedClipId,
     updateClipScore,
+    updateClipSection,
     toggleClipLock,
     previewLoading,
     refreshPreview,
@@ -21,6 +23,7 @@ export function Inspector() {
   const [exporting, setExporting] = useState<ExportFormat | null>(null)
 
   const selectedClip = clips.find((clip) => clip.id === selectedClipId)
+  const selectedItem = selectedClip ? itemSummaries[selectedClip.questionItemId] : null
   const totalScore = clips.reduce((sum, clip) => sum + clip.score, 0)
 
   const exportPaper = async (format: ExportFormat) => {
@@ -146,10 +149,47 @@ export function Inspector() {
           {selectedClip ? (
             <div className="space-y-3">
               <div>
+                <p className="text-xs text-zinc-400">题目摘要</p>
+                <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+                  {selectedItem?.contentPreview || '暂无题干摘要'}
+                </p>
+              </div>
+              <div>
                 <p className="text-xs text-zinc-400">题目 ID</p>
                 <p className="mt-1 break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
                   {selectedClip.questionItemId}
                 </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs text-zinc-500">
+                <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900/60">
+                  <p>学科</p>
+                  <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {selectedItem?.subject || '-'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900/60">
+                  <p>来源</p>
+                  <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {selectedItem?.sourceLabel || '-'}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-400">所在分区</label>
+                <select
+                  value={selectedClip.sectionId}
+                  onChange={(event) => updateClipSection(selectedClip.id, event.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {sections
+                    .slice()
+                    .sort((a, b) => a.order - b.order)
+                    .map((section) => (
+                      <option key={section.id} value={section.id}>
+                        {section.title}
+                      </option>
+                    ))}
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-zinc-400">分值</label>

@@ -45,6 +45,7 @@ export type PaperState = {
   // Source bin
   searchResults: QuestionItemSummary[]
   searchLoading: boolean
+  itemSummaries: Record<string, QuestionItemSummary>
 
   // Selection
   selectedClipId: string | null
@@ -63,6 +64,7 @@ export type PaperState = {
   moveClip: (clipId: string, targetSectionId: string, newOrder: number) => void
   reorderClips: (sectionId: string, clipIds: string[]) => void
   updateClipScore: (clipId: string, score: number) => void
+  updateClipSection: (clipId: string, sectionId: string) => void
   toggleClipLock: (clipId: string) => void
   moveClipInSection: (clipId: string, direction: 'up' | 'down') => void
 
@@ -85,6 +87,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   clips: [],
   searchResults: [],
   searchLoading: false,
+  itemSummaries: {},
   selectedClipId: null,
   previewPdf: null,
   previewLoading: false,
@@ -109,7 +112,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   },
 
   addClip: (sectionId, item, score) => {
-    const clips = get().clips
+    const { clips, itemSummaries } = get()
     const sectionClips = clips.filter((c) => c.sectionId === sectionId)
     const newClip: QuestionClip = {
       id: `qc-${++clipCounter}-${Date.now()}`,
@@ -121,19 +124,71 @@ export const usePaperStore = create<PaperState>((set, get) => ({
       hiddenParts: [],
       altItemIds: [],
     }
-    set({ clips: [...clips, newClip] })
+    set({
+      clips: [...clips, newClip],
+      itemSummaries: {
+        ...itemSummaries,
+        [item.id]: item,
+      },
+    })
   },
 
   removeClip: (clipId) => {
-    set((s) => ({ clips: s.clips.filter((c) => c.id !== clipId) }))
+    set((s) => {
+      const removingClip = s.clips.find((clip) => clip.id === clipId)
+      if (!removingClip) return s
+
+      const remainingSectionClips = s.clips
+        .filter((clip) => clip.sectionId === removingClip.sectionId && clip.id !== clipId)
+        .sort((a, b) => a.order - b.order)
+      const orderMap = new Map(remainingSectionClips.map((clip, index) => [clip.id, index]))
+
+      return {
+        clips: s.clips
+          .filter((clip) => clip.id !== clipId)
+          .map((clip) =>
+            clip.sectionId === removingClip.sectionId
+              ? { ...clip, order: orderMap.get(clip.id) ?? clip.order }
+              : clip,
+          ),
+      }
+    })
   },
 
   moveClip: (clipId, targetSectionId, newOrder) => {
-    set((s) => ({
-      clips: s.clips.map((c) =>
-        c.id === clipId ? { ...c, sectionId: targetSectionId, order: newOrder } : c,
-      ),
-    }))
+    set((s) => {
+      const movingClip = s.clips.find((clip) => clip.id === clipId)
+      if (!movingClip) return s
+
+      const targetSectionClips = s.clips
+        .filter((clip) => clip.sectionId === targetSectionId && clip.id !== clipId)
+        .sort((a, b) => a.order - b.order)
+
+      const insertAt = Math.max(0, Math.min(newOrder, targetSectionClips.length))
+      const reorderedTarget = [...targetSectionClips]
+      reorderedTarget.splice(insertAt, 0, { ...movingClip, sectionId: targetSectionId })
+      const targetOrderMap = new Map(reorderedTarget.map((clip, index) => [clip.id, index]))
+
+      const sourceSectionClips = s.clips
+        .filter((clip) => clip.sectionId === movingClip.sectionId && clip.id !== clipId)
+        .sort((a, b) => a.order - b.order)
+      const sourceOrderMap = new Map(sourceSectionClips.map((clip, index) => [clip.id, index]))
+
+      return {
+        clips: s.clips.map((clip) => {
+          if (clip.id === clipId) {
+            return { ...clip, sectionId: targetSectionId, order: insertAt }
+          }
+          if (clip.sectionId === targetSectionId) {
+            return { ...clip, order: targetOrderMap.get(clip.id) ?? clip.order }
+          }
+          if (clip.sectionId === movingClip.sectionId) {
+            return { ...clip, order: sourceOrderMap.get(clip.id) ?? clip.order }
+          }
+          return clip
+        }),
+      }
+    })
   },
 
   reorderClips: (sectionId, clipIds) => {
@@ -150,6 +205,12 @@ export const usePaperStore = create<PaperState>((set, get) => ({
     set((s) => ({
       clips: s.clips.map((c) => (c.id === clipId ? { ...c, score } : c)),
     }))
+  },
+
+  updateClipSection: (clipId, sectionId) => {
+    const state = get()
+    const targetOrder = state.clips.filter((clip) => clip.sectionId === sectionId).length
+    state.moveClip(clipId, sectionId, targetOrder)
   },
 
   toggleClipLock: (clipId) => {
@@ -212,7 +273,13 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         reviewStatus: item.reviewStatus,
         contentPreview: item.searchText || '',
       }))
-      set({ searchResults: items })
+      set((state) => ({
+        searchResults: items,
+        itemSummaries: {
+          ...state.itemSummaries,
+          ...Object.fromEntries(items.map((item) => [item.id, item])),
+        },
+      }))
     } finally {
       set({ searchLoading: false })
     }
