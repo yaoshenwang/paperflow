@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { db } from '@/db'
 import { questionItems } from '@/db/schema'
 import { sql } from 'drizzle-orm'
-import { renderToTypst } from '@paperflow/render-typst'
+import { renderToTypst, resolveTemplatePreset } from '@paperflow/render-typst'
 import type { PaperProject, QuestionItem, OutputMode } from '@paperflow/schema'
 import { getCurrentUser, hasPermission } from '@/lib/auth'
 import { FORMAL_RIGHTS_STATUSES, PUBLIC_REVIEW_STATUSES } from '@/lib/library-access'
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { title, sections, clips, format = 'pdf', mode = 'student' } = body
+  const { title, templatePreset = 'default', sections, clips, format = 'pdf', mode = 'student' } = body
 
   if (!clips || clips.length === 0) {
     return Response.json({ error: 'No clips' }, { status: 400 })
@@ -53,19 +53,26 @@ export async function POST(request: NextRequest) {
     }, { status: 403 })
   }
 
-  const paper = buildPaperProject(title, sections, clips, mode)
+  const paper = buildPaperProject(title, templatePreset, sections, clips, mode)
   const questionItemsForRender = items.map(rowToQuestionItem)
+  const template = resolveTemplatePreset(templatePreset)
 
   switch (format) {
     case 'typst': {
-      const typstSource = renderToTypst(paper, questionItemsForRender, { mode: mode as OutputMode })
+      const typstSource = renderToTypst(paper, questionItemsForRender, {
+        mode: mode as OutputMode,
+        template,
+      })
       return new Response(typstSource, {
         headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': `attachment; filename="${title}.typ"` },
       })
     }
 
     case 'pdf': {
-      const typstSource = renderToTypst(paper, questionItemsForRender, { mode: mode as OutputMode })
+      const typstSource = renderToTypst(paper, questionItemsForRender, {
+        mode: mode as OutputMode,
+        template,
+      })
       try {
         const pdf = await compileTypstToPdf(typstSource)
         return new Response(new Uint8Array(pdf) as unknown as BodyInit, {
@@ -108,7 +115,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function buildPaperProject(title: string, sections: unknown[], clips: unknown[], mode: string): PaperProject {
+function buildPaperProject(
+  title: string,
+  templatePreset: string,
+  sections: unknown[],
+  clips: unknown[],
+  mode: string,
+): PaperProject {
   return {
     id: 'export',
     orgId: 'export',
@@ -116,7 +129,7 @@ function buildPaperProject(title: string, sections: unknown[], clips: unknown[],
     blueprint: { subject: '数学', grade: '高一', totalScore: 0, sections: [] },
     sections: (sections ?? []) as PaperProject['sections'],
     clips: (clips ?? []) as PaperProject['clips'],
-    templatePreset: 'default',
+    templatePreset,
     outputModes: [mode as OutputMode],
     version: 1,
     status: 'draft',

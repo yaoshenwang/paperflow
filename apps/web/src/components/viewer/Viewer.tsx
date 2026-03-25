@@ -2,16 +2,20 @@
 
 import { usePaperStore } from '@/store/paper-store'
 import { RefreshCw, Loader2, FileText } from 'lucide-react'
+import { PREVIEW_MODE_META, TEMPLATE_PRESET_META } from '@/lib/template-presets'
 
 export function Viewer() {
-  const { previewPdf, previewLoading, refreshPreview, clips } = usePaperStore()
+  const { previewPdf, previewLoading, refreshPreview, clips, previewMode, templatePreset } = usePaperStore()
+  const modeLabel = PREVIEW_MODE_META.find((mode) => mode.id === previewMode)?.label ?? '学生卷'
+  const templateLabel = TEMPLATE_PRESET_META.find((preset) => preset.id === templatePreset)?.label ?? '默认模板'
 
   return (
     <div className="flex h-full flex-col bg-zinc-100 dark:bg-zinc-900">
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-        <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-          卷面预览
-        </h2>
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">卷面预览</h2>
+          <p className="text-xs text-zinc-500">{modeLabel} · {templateLabel}</p>
+        </div>
         <button
           onClick={refreshPreview}
           disabled={previewLoading || clips.length === 0}

@@ -1,5 +1,5 @@
 export { renderToTypst } from './render.js'
 export type { RenderOptions } from './render.js'
 export { renderBlock, renderInline, renderOptions } from './blocks.js'
-export { DEFAULT_TEMPLATE } from './templates.js'
-export type { TemplateTokens } from './templates.js'
+export { DEFAULT_TEMPLATE, TEMPLATE_PRESETS, resolveTemplatePreset } from './templates.js'
+export type { TemplateTokens, TemplatePresetId } from './templates.js'

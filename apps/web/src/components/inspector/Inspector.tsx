@@ -1,15 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, FileJson, FileText, Printer, RefreshCw, Settings } from 'lucide-react'
-import { usePaperStore } from '@/store/paper-store'
+import { Download, FileText, Printer, RefreshCw, Settings } from 'lucide-react'
+import { usePaperStore, type PreviewMode } from '@/store/paper-store'
+import { EXPORT_TARGETS, PREVIEW_MODE_META, TEMPLATE_PRESET_META } from '@/lib/template-presets'
 
-type ExportFormat = 'pdf' | 'typst' | 'json'
+type ExportFormat = 'pdf' | 'typst' | 'json' | 'docx_xml' | 'qti'
 
 export function Inspector() {
   const {
     title,
     setTitle,
+    templatePreset,
+    setTemplatePreset,
+    previewMode,
+    setPreviewMode,
     sections,
     clips,
     itemSummaries,
@@ -20,15 +25,18 @@ export function Inspector() {
     previewLoading,
     refreshPreview,
   } = usePaperStore()
-  const [exporting, setExporting] = useState<ExportFormat | null>(null)
+  const [exporting, setExporting] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
   const selectedClip = clips.find((clip) => clip.id === selectedClipId)
   const selectedItem = selectedClip ? itemSummaries[selectedClip.questionItemId] : null
   const totalScore = clips.reduce((sum, clip) => sum + clip.score, 0)
+  const selectedTemplate = TEMPLATE_PRESET_META.find((preset) => preset.id === templatePreset)
+  const selectedPreviewMode = PREVIEW_MODE_META.find((mode) => mode.id === previewMode)
 
-  const exportPaper = async (format: ExportFormat) => {
-    setExporting(format)
+  const exportPaper = async (format: ExportFormat, mode: PreviewMode) => {
+    const exportKey = `${format}:${mode}`
+    setExporting(exportKey)
     setExportError(null)
     try {
       const response = await fetch('/api/export', {
@@ -36,10 +44,11 @@ export function Inspector() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
+          templatePreset,
           sections,
           clips,
           format,
-          mode: 'student',
+          mode,
         }),
       })
 
@@ -52,9 +61,16 @@ export function Inspector() {
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      const ext = format === 'typst' ? 'typ' : format
+      const ext =
+        format === 'typst'
+          ? 'typ'
+          : format === 'docx_xml'
+            ? 'xml'
+            : format === 'qti'
+              ? 'xml'
+              : format
       link.href = url
-      link.download = `${title || 'paperflow'}.${ext}`
+      link.download = `${title || 'paperflow'}-${mode}.${ext}`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -83,6 +99,41 @@ export function Inspector() {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">模板预设</label>
+            <select
+              value={templatePreset}
+              onChange={(event) => setTemplatePreset(event.target.value as typeof templatePreset)}
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              {TEMPLATE_PRESET_META.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-zinc-500">{selectedTemplate?.description}</p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-medium text-zinc-500">预览模式</label>
+            <div className="grid grid-cols-3 gap-2">
+              {PREVIEW_MODE_META.map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setPreviewMode(mode.id)}
+                  className={`rounded-lg px-3 py-2 text-sm ${
+                    previewMode === mode.id
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900'
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900/60">
               <p className="text-xs text-zinc-400">题目数量</p>
@@ -92,6 +143,10 @@ export function Inspector() {
               <p className="text-xs text-zinc-400">当前总分</p>
               <p className="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{totalScore} 分</p>
             </div>
+          </div>
+
+          <div className="rounded-xl bg-zinc-50 p-3 text-xs text-zinc-500 dark:bg-zinc-900/60">
+            当前预览：{selectedPreviewMode?.label ?? '学生卷'} · {selectedTemplate?.label ?? '默认模板'}
           </div>
 
           <button
@@ -110,39 +165,28 @@ export function Inspector() {
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">导出</h3>
           </div>
           <div className="space-y-2">
-            <button
-              onClick={() => exportPaper('pdf')}
-              disabled={clips.length === 0 || exporting !== null}
-              className="flex w-full items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            >
-              <span className="flex items-center gap-2">
-                <Printer className="h-4 w-4" />
-                导出 PDF
-              </span>
-              <span className="text-xs text-zinc-400">{exporting === 'pdf' ? '处理中...' : '学生卷'}</span>
-            </button>
-            <button
-              onClick={() => exportPaper('typst')}
-              disabled={clips.length === 0 || exporting !== null}
-              className="flex w-full items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            >
-              <span className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                导出 Typst
-              </span>
-              <span className="text-xs text-zinc-400">{exporting === 'typst' ? '处理中...' : '排版源码'}</span>
-            </button>
-            <button
-              onClick={() => exportPaper('json')}
-              disabled={clips.length === 0 || exporting !== null}
-              className="flex w-full items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            >
-              <span className="flex items-center gap-2">
-                <FileJson className="h-4 w-4" />
-                导出 JSON
-              </span>
-              <span className="text-xs text-zinc-400">{exporting === 'json' ? '处理中...' : '结构化数据'}</span>
-            </button>
+            {EXPORT_TARGETS.map((target) => (
+              <button
+                key={`${target.format}-${target.mode}`}
+                onClick={() => exportPaper(target.format, target.mode)}
+                disabled={clips.length === 0 || exporting !== null}
+                className="flex w-full items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              >
+                <span className="flex items-center gap-2">
+                  {target.format === 'pdf' ? (
+                    <Printer className="h-4 w-4" />
+                  ) : target.format === 'typst' ? (
+                    <FileText className="h-4 w-4" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {target.label}
+                </span>
+                <span className="text-xs text-zinc-400">
+                  {exporting === `${target.format}:${target.mode}` ? '处理中...' : target.hint}
+                </span>
+              </button>
+            ))}
           </div>
           {exportError ? (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-950/30 dark:text-red-300">

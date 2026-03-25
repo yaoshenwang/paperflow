@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
     },
     paper: {
       title: bundle.paper.title,
+      templatePreset: bundle.paper.templatePreset,
       sections: bundle.paper.sections,
       clips: bundle.paper.clips,
     },

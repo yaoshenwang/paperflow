@@ -24,6 +24,9 @@ export type SectionNode = {
   order: number
 }
 
+export type PreviewMode = 'student' | 'teacher' | 'answer_sheet'
+export type TemplatePreset = 'default' | 'exam_standard' | 'practice_compact' | 'teacher_annotated' | 'answer_sheet'
+
 export type QuestionItemSummary = {
   id: string
   subject: string
@@ -40,6 +43,7 @@ export type PaperState = {
   // Paper metadata
   paperId: string | null
   title: string
+  templatePreset: TemplatePreset
   sections: SectionNode[]
   clips: QuestionClip[]
 
@@ -52,11 +56,14 @@ export type PaperState = {
   selectedClipId: string | null
 
   // Preview
+  previewMode: PreviewMode
   previewPdf: string | null
   previewLoading: boolean
 
   // Actions
   setTitle: (title: string) => void
+  setTemplatePreset: (preset: TemplatePreset) => void
+  setPreviewMode: (mode: PreviewMode) => void
   addSection: (title: string) => void
   removeSection: (sectionId: string) => void
 
@@ -70,7 +77,10 @@ export type PaperState = {
   moveClipInSection: (clipId: string, direction: 'up' | 'down') => void
 
   selectClip: (clipId: string | null) => void
-  loadPaper: (paper: { title: string; sections: SectionNode[]; clips: QuestionClip[] }, items: QuestionItemSummary[]) => void
+  loadPaper: (
+    paper: { title: string; templatePreset?: TemplatePreset; sections: SectionNode[]; clips: QuestionClip[] },
+    items: QuestionItemSummary[],
+  ) => void
 
   searchItems: (query: string, options?: { scope?: 'public' | 'school' | 'all' }) => Promise<void>
   refreshPreview: () => Promise<void>
@@ -81,6 +91,7 @@ let clipCounter = 0
 export const usePaperStore = create<PaperState>((set, get) => ({
   paperId: null,
   title: '未命名试卷',
+  templatePreset: 'default',
   sections: [
     { id: 'sec-1', title: '一、选择题', order: 0 },
     { id: 'sec-2', title: '二、填空题', order: 1 },
@@ -91,10 +102,13 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   searchLoading: false,
   itemSummaries: {},
   selectedClipId: null,
+  previewMode: 'student',
   previewPdf: null,
   previewLoading: false,
 
   setTitle: (title) => set({ title }),
+  setTemplatePreset: (templatePreset) => set({ templatePreset }),
+  setPreviewMode: (previewMode) => set({ previewMode }),
 
   addSection: (title) => {
     const sections = get().sections
@@ -260,6 +274,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   loadPaper: (paper, items) => {
     set((state) => ({
       title: paper.title,
+      templatePreset: paper.templatePreset ?? state.templatePreset,
       sections: paper.sections,
       clips: paper.clips,
       searchResults: items,
@@ -306,11 +321,11 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   refreshPreview: async () => {
     set({ previewLoading: true })
     try {
-      const { title, sections, clips } = get()
+      const { title, templatePreset, sections, clips, previewMode } = get()
       const res = await fetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, sections, clips, mode: 'student' }),
+        body: JSON.stringify({ title, templatePreset, sections, clips, mode: previewMode }),
       })
       if (res.ok) {
         const blob = await res.blob()

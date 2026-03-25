@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { db } from '@/db'
 import { questionItems } from '@/db/schema'
 import { inArray } from 'drizzle-orm'
-import { renderToTypst } from '@paperflow/render-typst'
+import { renderToTypst, resolveTemplatePreset } from '@paperflow/render-typst'
 import type { PaperProject, QuestionItem, OutputMode } from '@paperflow/schema'
 
 /**
@@ -13,7 +13,7 @@ import type { PaperProject, QuestionItem, OutputMode } from '@paperflow/schema'
  */
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { title, sections, clips, mode = 'student' } = body
+  const { title, templatePreset = 'default', sections, clips, mode = 'student' } = body
 
   if (!clips || clips.length === 0) {
     return Response.json({ error: 'No clips provided' }, { status: 400 })
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     },
     sections: sections || [],
     clips: clips,
-    templatePreset: 'default',
+    templatePreset,
     outputModes: [mode],
     version: 1,
     status: 'draft',
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
   // 渲染 Typst 源码
   const typstSource = renderToTypst(paper, questionItemsForRender, {
     mode: mode as OutputMode,
+    template: resolveTemplatePreset(templatePreset),
   })
 
   // 调用 compile-typst 服务或直接调用 typst CLI
