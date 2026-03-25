@@ -30,7 +30,11 @@ export function SourceBin() {
   const [scope, setScope] = useState<'public' | 'school' | 'all'>('public')
   const [user, setUser] = useState<SessionUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const { searchResults, searchLoading, searchItems, addClip, sections } = usePaperStore()
+  const [importing, setImporting] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importJson, setImportJson] = useState('')
+  const [importMessage, setImportMessage] = useState<string | null>(null)
+  const { searchResults, searchLoading, searchItems, addClip, sections, loadPaper } = usePaperStore()
 
   useEffect(() => {
     const loadUser = async () => {
@@ -80,6 +84,39 @@ export function SourceBin() {
     searchItems('', { scope: 'public' })
   }
 
+  const handleImport = async (format: 'demo' | 'paper_json') => {
+    setImporting(true)
+    setImportMessage(null)
+    try {
+      const response = await fetch('/api/imports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          format === 'demo'
+            ? { format }
+            : { format, payload: JSON.parse(importJson) },
+        ),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setImportMessage(data.error ?? '导入失败')
+        return
+      }
+
+      loadPaper(data.paper, data.items)
+      setImportMessage(`已导入 ${data.imported.items} 道题，并加载当前试卷。`)
+      if (format === 'paper_json') {
+        setImportJson('')
+        setImportOpen(false)
+      }
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : '导入失败')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <div className="border-b border-zinc-200 p-3 dark:border-zinc-800">
@@ -123,6 +160,54 @@ export function SourceBin() {
               </Link>
             </div>
           )}
+        </div>
+
+        <div className="mb-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">导入</p>
+              <p className="mt-1 text-xs text-zinc-500">适合开源版起步：直接导入 demo，或粘贴 `demo-paper.json` 同结构的 JSON。</p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => handleImport('demo')}
+              disabled={importing}
+              className="rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {importing ? '处理中...' : '导入示例数据'}
+            </button>
+            <button
+              onClick={() => setImportOpen((current) => !current)}
+              className="rounded border border-zinc-300 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              {importOpen ? '收起 JSON 导入' : '粘贴 JSON 导入'}
+            </button>
+          </div>
+
+          {importOpen ? (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={importJson}
+                onChange={(event) => setImportJson(event.target.value)}
+                rows={8}
+                placeholder='粘贴与 examples/sample-papers/demo-paper.json 同结构的 JSON'
+                className="w-full rounded border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              />
+              <button
+                onClick={() => handleImport('paper_json')}
+                disabled={importing || !importJson.trim()}
+                className="rounded bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                导入当前 JSON
+              </button>
+            </div>
+          ) : null}
+
+          {importMessage ? (
+            <p className="mt-3 text-xs text-zinc-500">{importMessage}</p>
+          ) : null}
         </div>
 
         <div className="mb-2">

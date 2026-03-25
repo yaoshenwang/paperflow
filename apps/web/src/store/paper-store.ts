@@ -70,6 +70,7 @@ export type PaperState = {
   moveClipInSection: (clipId: string, direction: 'up' | 'down') => void
 
   selectClip: (clipId: string | null) => void
+  loadPaper: (paper: { title: string; sections: SectionNode[]; clips: QuestionClip[] }, items: QuestionItemSummary[]) => void
 
   searchItems: (query: string, options?: { scope?: 'public' | 'school' | 'all' }) => Promise<void>
   refreshPreview: () => Promise<void>
@@ -255,6 +256,20 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   },
 
   selectClip: (clipId) => set({ selectedClipId: clipId }),
+
+  loadPaper: (paper, items) => {
+    set((state) => ({
+      title: paper.title,
+      sections: paper.sections,
+      clips: paper.clips,
+      searchResults: items,
+      itemSummaries: {
+        ...state.itemSummaries,
+        ...Object.fromEntries(items.map((item) => [item.id, item])),
+      },
+      selectedClipId: paper.clips[0]?.id ?? null,
+    }))
+  },
 
   searchItems: async (query, options) => {
     set({ searchLoading: true })
