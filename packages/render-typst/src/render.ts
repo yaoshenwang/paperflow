@@ -19,6 +19,43 @@ function renderBlocks(blocks: Block[]): string {
   return blocks.map(renderBlock).join('\n\n')
 }
 
+function renderScore(clip: QuestionClip, template: TemplateTokens): string {
+  const label = `${clip.score}分`
+  if (template.scoreStyle === 'pill') {
+    return `#box(fill: ${template.scorePillFill}, inset: (x: 6pt, y: 2pt), radius: 999pt)[${label}]`
+  }
+
+  return `（${label}）`
+}
+
+function renderAnswerBlock(label: string, content: string, template: TemplateTokens): string {
+  if (template.answerBlockStyle === 'outline') {
+    return `#block(stroke: 0.8pt + ${template.answerBlockTone}, inset: 8pt, radius: 4pt)[*${label}：* ${content}]`
+  }
+
+  return `#block(fill: ${template.answerBlockTone}, inset: 8pt, radius: 4pt)[*${label}：* ${content}]`
+}
+
+function renderAnalysisBlock(content: string, template: TemplateTokens): string {
+  if (template.analysisBlockStyle === 'soft-fill') {
+    return `#block(fill: ${template.analysisBlockTone}, inset: 8pt, radius: 4pt)[_解析：_ ${content}]`
+  }
+
+  return `#block(inset: 8pt)[_解析：_ ${content}]`
+}
+
+function renderSectionTitle(title: string, template: TemplateTokens): string {
+  if (template.sectionTitleStyle === 'underline') {
+    return `== #underline[${title}]`
+  }
+
+  if (template.sectionTitleStyle === 'boxed') {
+    return `== #box(fill: ${template.sectionTone}, inset: (x: 10pt, y: 5pt), radius: 4pt)[*${title}*]`
+  }
+
+  return `== *${title}*`
+}
+
 /** 渲染页面设置 */
 function renderPageSetup(template: TemplateTokens, paper: PaperProject): string {
   const lines: string[] = []
@@ -30,7 +67,11 @@ function renderPageSetup(template: TemplateTokens, paper: PaperProject): string 
   }
   if (template.headerRight) lines.push(`  #align(right)[${template.headerRight}]`)
   lines.push('], footer: [')
-  lines.push(`  #align(center)[#context counter(page).display()]`)
+  if (template.footerCenter) {
+    lines.push(`  #align(center)[${template.footerCenter} #h(0.8em) #context counter(page).display()]`)
+  } else {
+    lines.push(`  #align(center)[#context counter(page).display()]`)
+  }
   lines.push('])')
 
   lines.push(`#set text(size: ${template.fontSize})`)
@@ -40,8 +81,27 @@ function renderPageSetup(template: TemplateTokens, paper: PaperProject): string 
 }
 
 /** 渲染标题 */
-function renderTitle(paper: PaperProject): string {
-  return `#align(center)[#text(size: 16pt, weight: "bold")[${paper.title}]]
+function renderTitle(paper: PaperProject, template: TemplateTokens): string {
+  const title = `#text(size: ${template.titleSize}, weight: "bold")[${paper.title}]`
+  const alignedTitle = `#align(${template.titleAlign})[${title}]`
+
+  if (template.titleDecoration === 'double-rule') {
+    return `#line(length: 100%)
+#v(0.4em)
+${alignedTitle}
+#v(0.4em)
+#line(length: 100%)
+
+#v(0.9em)`
+  }
+
+  if (template.titleDecoration === 'banner') {
+    return `#block(fill: ${template.titleDecorationFill}, inset: (x: 14pt, y: 10pt), radius: 6pt)[${alignedTitle}]
+
+#v(0.9em)`
+  }
+
+  return `${alignedTitle}
 
 #v(1em)`
 }
@@ -61,7 +121,7 @@ function renderQuestionContent(
 ): string {
   const lines: string[] = []
   const num = questionNumber(globalIndex, template.questionNumberStyle)
-  const scoreText = `（${clip.score}分）`
+  const scoreText = renderScore(clip, template)
   const showSolutions = shouldShowSolutions(mode)
 
   // 题干
@@ -80,11 +140,11 @@ function renderQuestionContent(
       lines.push(`（${sub.order}）${renderBlocks(sub.stem)}`)
       if (showSolutions && !clip.hiddenParts.includes('answer') && sub.answer) {
         lines.push('')
-        lines.push(`#block(fill: luma(240), inset: 8pt, radius: 4pt)[*答案：* ${renderBlocks(sub.answer)}]`)
+        lines.push(renderAnswerBlock('答案', renderBlocks(sub.answer), template))
       }
       if (showSolutions && !clip.hiddenParts.includes('analysis') && sub.analysis) {
         lines.push('')
-        lines.push(`#block(inset: 8pt)[_解析：_ ${renderBlocks(sub.analysis)}]`)
+        lines.push(renderAnalysisBlock(renderBlocks(sub.analysis), template))
       }
     }
   }
@@ -92,13 +152,13 @@ function renderQuestionContent(
   // 答案
   if (showSolutions && !clip.hiddenParts.includes('answer') && item.content.answer) {
     lines.push('')
-    lines.push(`#block(fill: luma(240), inset: 8pt, radius: 4pt)[*答案：* ${renderBlocks(item.content.answer)}]`)
+    lines.push(renderAnswerBlock('答案', renderBlocks(item.content.answer), template))
   }
 
   // 解析
   if (showSolutions && !clip.hiddenParts.includes('analysis') && item.content.analysis) {
     lines.push('')
-    lines.push(`#block(inset: 8pt)[_解析：_ ${renderBlocks(item.content.analysis)}]`)
+    lines.push(renderAnalysisBlock(renderBlocks(item.content.analysis), template))
   }
 
   return lines.join('\n')
@@ -117,14 +177,19 @@ function renderAnswerSheetQuestion(
   if (qType === 'single_choice' || qType === 'multiple_choice') {
     const optCount = item.content.options?.length ?? 4
     const labels = Array.from({ length: optCount }, (_, i) => String.fromCharCode(65 + i))
-    const bubbles = labels.map((l) => `[${l}]`).join(' #h(1em) ')
+    const bubbles = labels
+      .map(
+        (label) =>
+          `#box(stroke: ${template.answerSheetBubbleStroke}, inset: (x: 7pt, y: 3pt), radius: ${template.answerSheetBubbleRadius})[${label}]`,
+      )
+      .join(` #h(${template.answerSheetBubbleGap}) `)
     return `*${num}.* #h(1em) ${bubbles}`
   }
 
   // 主观题：留出答题区
   const areaSize = clip.layoutHints?.answerAreaSize ?? 'm'
   const height = template.answerAreaSize[areaSize]
-  return `*${num}.* （${clip.score}分）\n\n#block(height: ${height}, width: 100%, stroke: 0.5pt + luma(200), radius: 2pt)[]`
+  return `*${num}.* ${renderScore(clip, template)}\n\n#block(height: ${height}, width: 100%, stroke: ${template.answerSheetBubbleStroke}, radius: ${template.answerSheetBubbleRadius})[]`
 }
 
 /** 主渲染函数：将 Paper AST 转换为 Typst 源码 */
@@ -143,19 +208,14 @@ export function renderToTypst(
   parts.push('')
 
   // 标题
-  parts.push(renderTitle(paper))
+  parts.push(renderTitle(paper, template))
 
   // 按 section.order 排序后渲染
   const sortedSections = [...paper.sections].sort((a, b) => a.order - b.order)
   let globalIndex = 0
   for (const section of sortedSections) {
-    // Section 标题
-    const sectionTitle =
-      template.sectionTitleStyle === 'bold'
-        ? `*${section.title}*`
-        : `#underline[${section.title}]`
-    parts.push(`== ${sectionTitle}`)
-    parts.push('')
+    parts.push(renderSectionTitle(section.title, template))
+    parts.push(`#v(${template.sectionGap})`)
 
     // 该 section 下的 clips（按 order 排序）
     const sectionClips = paper.clips
@@ -177,7 +237,7 @@ export function renderToTypst(
         parts.push(renderQuestionContent(clip, item, globalIndex, template, options.mode))
       }
 
-      parts.push('')
+      parts.push(`#v(${template.questionGap})`)
       globalIndex++
     }
   }
