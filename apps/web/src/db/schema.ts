@@ -121,6 +121,31 @@ export const questionItems = pgTable(
 )
 
 /**
+ * organizations — 组织/学校
+ */
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+/**
+ * users — 用户
+ */
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  orgId: uuid('org_id').references(() => organizations.id),
+  role: text('role', {
+    enum: ['teacher', 'reviewer', 'librarian', 'org_admin'],
+  }).notNull().default('teacher'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+/**
  * paper_projects — 试卷项目表
  */
 export const paperProjects = pgTable('paper_projects', {
