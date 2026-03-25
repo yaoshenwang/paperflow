@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
   const grade = params.get('grade')
   const type = params.get('type')
   const status = params.get('status')
-  const limit = Math.min(Number(params.get('limit')) || 20, 100)
-  const offset = Number(params.get('offset')) || 0
+  const limit = Math.max(1, Math.min(Number(params.get('limit')) || 20, 100))
+  const offset = Math.max(0, Number(params.get('offset')) || 0)
 
   const conditions = []
 

@@ -25,6 +25,13 @@ export async function GET(
   return Response.json(item)
 }
 
+/** 可更新字段白名单 */
+const UPDATABLE_FIELDS = new Set([
+  'subject', 'grade', 'textbookVersion', 'knowledgeIds', 'abilityTags',
+  'questionType', 'difficulty', 'content', 'examName', 'region', 'school',
+  'year', 'sourceLabel', 'reviewStatus', 'answerVerified', 'rightsStatus',
+])
+
 /**
  * PATCH /api/items/:id — 更新题目
  */
@@ -35,10 +42,27 @@ export async function PATCH(
   const { id } = await ctx.params
   const body = await request.json()
 
+  // 只允许白名单字段更新
+  const updates: Record<string, unknown> = {}
+  for (const key of Object.keys(body)) {
+    if (UPDATABLE_FIELDS.has(key)) {
+      updates[key] = body[key]
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return Response.json({ error: 'No updatable fields provided' }, { status: 400 })
+  }
+
+  // 如果 content 被更新，重新计算 searchText
+  if (updates.content) {
+    updates.searchText = extractSearchText(updates.content as Record<string, unknown>)
+  }
+
   const [updated] = await db
     .update(questionItems)
     .set({
-      ...body,
+      ...updates,
       updatedAt: new Date(),
     })
     .where(eq(questionItems.id, id))
@@ -49,6 +73,23 @@ export async function PATCH(
   }
 
   return Response.json(updated)
+}
+
+/** 从 Block AST 中提取纯文本用于全文搜索 */
+function extractSearchText(content: Record<string, unknown>): string {
+  const texts: string[] = []
+  function walk(node: unknown) {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    const obj = node as Record<string, unknown>
+    if (obj.type === 'text' && typeof obj.text === 'string') texts.push(obj.text)
+    if ((obj.type === 'math_inline' || obj.type === 'math_block') && typeof obj.typst === 'string') texts.push(obj.typst)
+    for (const key of ['children', 'stem', 'options', 'answer', 'analysis', 'subquestions', 'content']) {
+      if (obj[key]) walk(obj[key])
+    }
+  }
+  walk(content)
+  return texts.join(' ')
 }
 
 /**
