@@ -1,0 +1,273 @@
+{
+  "paper": {
+    "id": "pp-demo-001",
+    "orgId": "org-demo",
+    "title": "高一数学期中测试卷",
+    "blueprint": {
+      "subject": "数学",
+      "grade": "高一",
+      "totalScore": 30,
+      "duration": 45,
+      "sections": [
+        { "questionType": "single_choice", "count": 1, "scorePerItem": 5 },
+        { "questionType": "fill_blank", "count": 1, "scorePerItem": 5 },
+        { "questionType": "computation", "count": 1, "scorePerItem": 20 }
+      ]
+    },
+    "sections": [
+      { "id": "sec-choice", "title": "一、选择题（每小题5分）", "order": 0 },
+      { "id": "sec-fill", "title": "二、填空题（每小题5分）", "order": 1 },
+      { "id": "sec-answer", "title": "三、解答题（共20分）", "order": 2 }
+    ],
+    "clips": [
+      {
+        "id": "qc-001",
+        "questionItemId": "qi-001",
+        "sectionId": "sec-choice",
+        "order": 0,
+        "score": 5,
+        "locked": false,
+        "hiddenParts": [],
+        "altItemIds": []
+      },
+      {
+        "id": "qc-002",
+        "questionItemId": "qi-002",
+        "sectionId": "sec-fill",
+        "order": 0,
+        "score": 5,
+        "locked": false,
+        "hiddenParts": [],
+        "altItemIds": []
+      },
+      {
+        "id": "qc-003",
+        "questionItemId": "qi-003",
+        "sectionId": "sec-answer",
+        "order": 0,
+        "score": 20,
+        "locked": false,
+        "hiddenParts": [],
+        "altItemIds": [],
+        "layoutHints": { "answerAreaSize": "l" }
+      }
+    ],
+    "templatePreset": "default",
+    "outputModes": ["student", "teacher", "answer_sheet"],
+    "version": 1,
+    "status": "draft"
+  },
+  "items": [
+    {
+      "id": "qi-001",
+      "canonicalId": "cq-001",
+      "sourceDocumentId": "sd-001",
+      "sourceLocator": { "page": 3, "questionNo": "5" },
+      "taxonomy": {
+        "subject": "数学",
+        "grade": "高一",
+        "knowledgeIds": ["func-domain"],
+        "abilityTags": ["理解"],
+        "questionType": "single_choice",
+        "difficulty": 0.3
+      },
+      "content": {
+        "stem": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "函数 " },
+              { "type": "math_inline", "typst": "f(x) = sqrt(x - 1)" },
+              { "type": "text", "text": " 的定义域是" }
+            ]
+          }
+        ],
+        "options": [
+          { "label": "A", "content": [{ "type": "paragraph", "children": [{ "type": "math_inline", "typst": "[1, +infinity)" }] }] },
+          { "label": "B", "content": [{ "type": "paragraph", "children": [{ "type": "math_inline", "typst": "(1, +infinity)" }] }] },
+          { "label": "C", "content": [{ "type": "paragraph", "children": [{ "type": "math_inline", "typst": "(-infinity, 1]" }] }] },
+          { "label": "D", "content": [{ "type": "paragraph", "children": [{ "type": "math_inline", "typst": "(-infinity, 1)" }] }] }
+        ],
+        "answer": [{ "type": "paragraph", "children": [{ "type": "text", "text": "A" }] }],
+        "analysis": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "要使 " },
+              { "type": "math_inline", "typst": "sqrt(x - 1)" },
+              { "type": "text", "text": " 有意义，需 " },
+              { "type": "math_inline", "typst": "x - 1 >= 0" },
+              { "type": "text", "text": "，即 " },
+              { "type": "math_inline", "typst": "x >= 1" },
+              { "type": "text", "text": "。故选A。" }
+            ]
+          }
+        ],
+        "assets": []
+      },
+      "provenance": {
+        "examName": "期中考试",
+        "region": "北京",
+        "year": 2024,
+        "sourceLabel": "2024北京某校高一期中"
+      },
+      "quality": {
+        "reviewStatus": "approved",
+        "answerVerified": true
+      },
+      "rightsStatus": "school_owned"
+    },
+    {
+      "id": "qi-002",
+      "canonicalId": "cq-002",
+      "sourceDocumentId": "sd-001",
+      "sourceLocator": { "page": 4, "questionNo": "15" },
+      "taxonomy": {
+        "subject": "数学",
+        "grade": "高一",
+        "knowledgeIds": ["trig-basic"],
+        "abilityTags": ["计算"],
+        "questionType": "fill_blank",
+        "difficulty": 0.5
+      },
+      "content": {
+        "stem": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "math_inline", "typst": "sin 30degree + cos 60degree" },
+              { "type": "text", "text": " = ________。" }
+            ]
+          }
+        ],
+        "answer": [
+          {
+            "type": "paragraph",
+            "children": [{ "type": "math_inline", "typst": "1" }]
+          }
+        ],
+        "analysis": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "math_inline", "typst": "sin 30degree = 1/2" },
+              { "type": "text", "text": "，" },
+              { "type": "math_inline", "typst": "cos 60degree = 1/2" },
+              { "type": "text", "text": "，故原式 " },
+              { "type": "math_inline", "typst": "= 1/2 + 1/2 = 1" },
+              { "type": "text", "text": "。" }
+            ]
+          }
+        ],
+        "assets": []
+      },
+      "provenance": {
+        "examName": "月考",
+        "region": "北京",
+        "year": 2023,
+        "sourceLabel": "2023北京某校高一月考"
+      },
+      "quality": {
+        "reviewStatus": "approved",
+        "answerVerified": true
+      },
+      "rightsStatus": "school_owned"
+    },
+    {
+      "id": "qi-003",
+      "canonicalId": "cq-003",
+      "sourceDocumentId": "sd-002",
+      "sourceLocator": { "page": 6, "questionNo": "18" },
+      "taxonomy": {
+        "subject": "数学",
+        "grade": "高一",
+        "knowledgeIds": ["func-properties", "func-monotone"],
+        "abilityTags": ["推理", "计算"],
+        "questionType": "computation",
+        "difficulty": 0.7
+      },
+      "content": {
+        "stem": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "已知函数 " },
+              { "type": "math_inline", "typst": "f(x) = x^2 - 2x + 3" },
+              { "type": "text", "text": "。" }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "（1）求函数 " },
+              { "type": "math_inline", "typst": "f(x)" },
+              { "type": "text", "text": " 的最小值；" }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "（2）判断 " },
+              { "type": "math_inline", "typst": "f(x)" },
+              { "type": "text", "text": " 在 " },
+              { "type": "math_inline", "typst": "[1, +infinity)" },
+              { "type": "text", "text": " 上的单调性，并证明。" }
+            ]
+          }
+        ],
+        "answer": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "（1）" },
+              { "type": "math_inline", "typst": "f(x) = (x-1)^2 + 2" },
+              { "type": "text", "text": "，当 " },
+              { "type": "math_inline", "typst": "x = 1" },
+              { "type": "text", "text": " 时取最小值 " },
+              { "type": "math_inline", "typst": "f(1) = 2" },
+              { "type": "text", "text": "。" }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "（2）" },
+              { "type": "math_inline", "typst": "f(x)" },
+              { "type": "text", "text": " 在 " },
+              { "type": "math_inline", "typst": "[1, +infinity)" },
+              { "type": "text", "text": " 上单调递增。" }
+            ]
+          }
+        ],
+        "analysis": [
+          {
+            "type": "paragraph",
+            "children": [
+              { "type": "text", "text": "配方法可得 " },
+              { "type": "math_inline", "typst": "f(x) = (x-1)^2 + 2" },
+              { "type": "text", "text": "，顶点为 " },
+              { "type": "math_inline", "typst": "(1, 2)" },
+              { "type": "text", "text": "。对于单调性证明，取 " },
+              { "type": "math_inline", "typst": "x_1 > x_2 >= 1" },
+              { "type": "text", "text": "，则 " },
+              { "type": "math_inline", "typst": "f(x_1) - f(x_2) = (x_1 - x_2)(x_1 + x_2 - 2) > 0" },
+              { "type": "text", "text": "。" }
+            ]
+          }
+        ],
+        "assets": []
+      },
+      "provenance": {
+        "examName": "期中考试",
+        "region": "北京",
+        "year": 2024,
+        "sourceLabel": "2024北京某校高一期中"
+      },
+      "quality": {
+        "reviewStatus": "approved",
+        "answerVerified": true
+      },
+      "rightsStatus": "school_owned"
+    }
+  ]
+}

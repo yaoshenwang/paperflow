@@ -1,0 +1,22 @@
+{
+  "name": "@paperflow/compile-typst",
+  "version": "0.1.0",
+  "description": "Typst compilation HTTP service",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@paperflow/schema": "workspace:*",
+    "@paperflow/render-typst": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0"
+  }
+}
