@@ -46,7 +46,12 @@ function renderTitle(paper: PaperProject): string {
 #v(1em)`
 }
 
-/** 渲染单个题目（学生/教师模式） */
+/** 判断是否应显示答案/解析 */
+function shouldShowSolutions(mode: OutputMode): boolean {
+  return mode === 'teacher' || mode === 'solution_book'
+}
+
+/** 渲染单个题目（学生/教师/解析册模式） */
 function renderQuestionContent(
   clip: QuestionClip,
   item: QuestionItem,
@@ -56,7 +61,8 @@ function renderQuestionContent(
 ): string {
   const lines: string[] = []
   const num = questionNumber(globalIndex, template.questionNumberStyle)
-  const scoreText = mode === 'teacher' ? `（${clip.score}分）` : `（${clip.score}分）`
+  const scoreText = `（${clip.score}分）`
+  const showSolutions = shouldShowSolutions(mode)
 
   // 题干
   lines.push(`*${num}.* ${scoreText} ${renderBlocks(item.content.stem)}`)
@@ -72,25 +78,25 @@ function renderQuestionContent(
     for (const sub of item.content.subquestions) {
       lines.push('')
       lines.push(`（${sub.order}）${renderBlocks(sub.stem)}`)
-      if (mode === 'teacher' && sub.answer) {
+      if (showSolutions && !clip.hiddenParts.includes('answer') && sub.answer) {
         lines.push('')
         lines.push(`#block(fill: luma(240), inset: 8pt, radius: 4pt)[*答案：* ${renderBlocks(sub.answer)}]`)
       }
-      if (mode === 'teacher' && sub.analysis) {
+      if (showSolutions && !clip.hiddenParts.includes('analysis') && sub.analysis) {
         lines.push('')
         lines.push(`#block(inset: 8pt)[_解析：_ ${renderBlocks(sub.analysis)}]`)
       }
     }
   }
 
-  // 答案（教师模式）
-  if (mode === 'teacher' && !clip.hiddenParts.includes('answer') && item.content.answer) {
+  // 答案
+  if (showSolutions && !clip.hiddenParts.includes('answer') && item.content.answer) {
     lines.push('')
     lines.push(`#block(fill: luma(240), inset: 8pt, radius: 4pt)[*答案：* ${renderBlocks(item.content.answer)}]`)
   }
 
-  // 解析（教师模式）
-  if (mode === 'teacher' && !clip.hiddenParts.includes('analysis') && item.content.analysis) {
+  // 解析
+  if (showSolutions && !clip.hiddenParts.includes('analysis') && item.content.analysis) {
     lines.push('')
     lines.push(`#block(inset: 8pt)[_解析：_ ${renderBlocks(item.content.analysis)}]`)
   }
@@ -139,9 +145,10 @@ export function renderToTypst(
   // 标题
   parts.push(renderTitle(paper))
 
-  // 按 section 渲染
+  // 按 section.order 排序后渲染
+  const sortedSections = [...paper.sections].sort((a, b) => a.order - b.order)
   let globalIndex = 0
-  for (const section of paper.sections) {
+  for (const section of sortedSections) {
     // Section 标题
     const sectionTitle =
       template.sectionTitleStyle === 'bold'
