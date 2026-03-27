@@ -11,6 +11,7 @@
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
+    "paperflow": "node ./packages/cli/dist/cli.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

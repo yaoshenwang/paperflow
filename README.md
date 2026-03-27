@@ -1,26 +1,40 @@
 # Paperflow
 
-Paperflow is an open-source, AI-native paper composition workspace.
+Paperflow is a file-first exam workspace built around Quarto.
 
-It treats:
-- question items as source material
-- a paper as a structured workspace
-- Typst as the layout engine
-- AI as an auditable assistant, not the source of truth
+A project is a normal folder:
 
-The current repository already includes:
-- a running Next.js Studio at `apps/web`
-- core schema packages in `packages/schema`
-- Typst / DOCX XML / QTI renderers
-- demo sample data in `examples/sample-papers/demo-paper.json`
-- a lightweight import flow for demo data and JSON bundles
+```text
+my-exam/
+  _quarto.yml
+  paper.qmd
+  questions/
+    q-001.md
+  assets/
+  templates/
+    school-default/
+      _extension.yml
+      question.lua
+      template.typ
+  packs.lock
+  .paperflow/
+```
+
+The source of truth is:
+- `paper.qmd` for paper structure and question references
+- `questions/*.md` for individual questions
+- local template files for layout and shortcode behavior
+
+## Requirements
+
+- Node.js 20+
+- `pnpm`
+- `quarto`
+- `pandoc`
+
+`typst` is optional now. When Quarto is available, PDF and DOCX export go through Quarto/Pandoc first.
 
 ## Quick Start
-
-Requirements:
-- `pnpm`
-- PostgreSQL
-- `typst` CLI available in `PATH`
 
 Install dependencies:
 
@@ -28,7 +42,22 @@ Install dependencies:
 pnpm install
 ```
 
-Start the web app:
+Initialize a new project:
+
+```bash
+pnpm --filter @paperflow/cli run build
+pnpm paperflow init ~/Documents/my-exam --title "高一数学期中测试" --subject 数学 --grade 高一
+```
+
+Render exports:
+
+```bash
+pnpm paperflow render ~/Documents/my-exam --out ~/Documents/my-exam/out/paper.pdf
+pnpm paperflow render ~/Documents/my-exam --format docx --mode teacher --out ~/Documents/my-exam/out/paper-teacher.docx
+pnpm paperflow lint ~/Documents/my-exam
+```
+
+Run the web app:
 
 ```bash
 cd apps/web
@@ -36,54 +65,49 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Open:
-- `http://localhost:3000/`
-- `http://localhost:3000/studio`
-- `http://localhost:3000/review`
+Main routes:
+- `/`
+- `/new`
+- `/editor`
+- `/questions/[id]`
+- `/export`
 
-## First Demo
+## Question Packs
 
-1. Open `/studio`.
-2. In the left panel, click `导入示例数据`.
-3. Switch template presets and preview mode.
-4. Export student paper PDF, teacher paper PDF, answer sheet PDF, QTI XML, or JSON AST.
+Build a distributable question pack:
 
-You can also paste a JSON bundle with the same shape as:
-- `examples/sample-papers/demo-paper.json`
+```bash
+pnpm paperflow pack build /path/to/algebra-pack --out /path/to/dist
+```
+
+Install a pack into a project:
+
+```bash
+pnpm paperflow pack install /path/to/dist/algebra-pack-0.1.0.paperflow-pack.zip --project ~/Documents/my-exam
+```
 
 ## Repository Map
 
 ```text
 apps/
-  web/             Next.js Studio + APIs
-  compile-typst/   Typst compile service
+  web/             Next.js file-workspace UI + APIs
+  compile-typst/   Typst compile helper
 
 packages/
-  schema/          Canonical paper/question/source schemas
-  render-typst/    AST -> Typst
-  render-docx/     AST -> DOCX XML
-  render-qti/      AST -> QTI XML
+  cli/             `paperflow` CLI
+  exam-markdown/   File-first project reader/writer/lint/quarto helpers
+  schema/          Legacy structured schemas used by fallback renderers
+  render-typst/    Legacy Typst fallback renderer
+  render-docx/     Legacy DOCX fallback renderer
+  render-qti/      QTI renderer
 
 examples/
-  sample-papers/   Demo paper, output samples, end-to-end render script
-
-docs/
-  PRD.md
-  ARCHITECTURE.md
+  demo-project/    Quarto-style demo workspace
+  sample-papers/   Legacy sample data
 ```
 
-## Current Product Focus
+## Status
 
-For the open-source early stage, the most important things are:
-- demoability
-- importability
-- stable paper rendering
-- structured export
+Current main path is single-user, local-first, and Quarto-first.
 
-This repository is intentionally prioritizing:
-- schema
-- Studio workflow
-- Typst templates
-- import/export tooling
-
-over heavier enterprise workflows such as deep org management or full moderation systems.
+Legacy auth/organization/database code still exists in the repo, but it is no longer the primary workflow.

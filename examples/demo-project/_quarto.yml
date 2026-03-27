@@ -1,0 +1,8 @@
+project:
+  type: default
+metadata-files:
+  - templates/school-default/variables.yml
+shortcodes:
+  - templates/school-default/question.lua
+execute:
+  freeze: auto

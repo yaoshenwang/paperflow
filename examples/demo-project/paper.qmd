@@ -1,0 +1,26 @@
+---
+title: 高一数学期中测试卷
+subject: 数学
+grade: 高一
+format:
+  typst:
+    output-file: student.pdf
+paperflow:
+  mode: student
+  template: school-default
+  show_score: false
+  show_answer: false
+  show_analysis: false
+---
+
+## 一、选择题
+
+{{< question file="questions/q-001.md" score="5" >}}
+
+## 二、填空题
+
+{{< question file="questions/q-002.md" score="5" >}}
+
+## 三、解答题
+
+{{< question file="questions/q-003.md" score="20" >}}

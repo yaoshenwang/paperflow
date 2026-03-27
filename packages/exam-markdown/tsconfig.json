@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": [
+    "src/index.ts",
+    "src/types.ts",
+    "src/front-matter.ts",
+    "src/question-file.ts",
+    "src/paper-file.ts",
+    "src/lint.ts",
+    "src/quarto.ts",
+    "src/workspace.ts",
+    "src/yaml.ts"
+  ]
+}

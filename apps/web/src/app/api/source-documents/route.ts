@@ -1,74 +1,81 @@
 import { NextRequest } from 'next/server'
-import { db } from '@/db'
-import { sourceDocuments } from '@/db/schema'
-import { and, eq } from 'drizzle-orm'
-import { getCurrentUser, hasPermission } from '@/lib/auth'
-import { buildSourceDocumentVisibilityCondition, canManageRights, resolveLibraryScope } from '@/lib/library-access'
+import { readProject } from '@/lib/workspace/project'
+import { resolveProjectPath } from '@/lib/workspace/paths'
 
-/**
- * GET /api/source-documents — 列表来源文档
- */
-export async function GET(request: NextRequest) {
-  const user = await getCurrentUser()
-  if (user && !hasPermission(user.role, 'items:read')) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
+function getProjectPath(input: string | null) {
+  if (!input?.trim()) {
+    throw new Error('projectPath is required')
   }
-
-  const scope = resolveLibraryScope(request.nextUrl.searchParams.get('scope'), user)
-  const docs = await db
-    .select()
-    .from(sourceDocuments)
-    .where(and(buildSourceDocumentVisibilityCondition(user, scope)))
-    .orderBy(sourceDocuments.createdAt)
-
-  return Response.json({ documents: docs })
+  return resolveProjectPath(input)
 }
 
 /**
- * POST /api/source-documents — 创建来源文档
+ * GET /api/source-documents — 从工作区题目文件派生来源信息
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const projectPath = getProjectPath(request.nextUrl.searchParams.get('projectPath'))
+    const snapshot = await readProject(projectPath)
+    const documentsByKey = new Map<string, {
+      id: string
+      title: string
+      region: string | null
+      year: number | null
+      subject: string
+      grade: string
+      rightsStatus: string
+      reviewStatus: string
+      questionIds: string[]
+    }>()
+
+    for (const question of snapshot.questions) {
+      const title = question.source.label?.trim() || question.id
+      const region = question.source.region ?? null
+      const year = question.source.year ?? null
+      const key = `${title}::${region ?? ''}::${year ?? ''}`
+      const current = documentsByKey.get(key)
+
+      if (current) {
+        current.questionIds.push(question.id)
+        continue
+      }
+
+      documentsByKey.set(key, {
+        id: key,
+        title,
+        region,
+        year,
+        subject: question.subject,
+        grade: question.grade,
+        rightsStatus: question.rights,
+        reviewStatus: question.review,
+        questionIds: [question.id],
+      })
+    }
+
+    return Response.json({
+      projectPath,
+      documents: Array.from(documentsByKey.values()),
+    })
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 400 },
+    )
+  }
+}
+
+/**
+ * POST /api/source-documents — workspace-first 模式下不再维护独立来源表
  */
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser()
-  if (!user) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 })
-  }
-  if (!hasPermission(user.role, 'source_documents:create')) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const body = (await request.json().catch(() => ({}))) as { projectPath?: string }
 
-  const body = await request.json()
-
-  if (!canManageRights(user) && !user.orgId) {
-    return Response.json({ error: '当前账号未加入组织，无法上传校本资源' }, { status: 400 })
-  }
-
-  if (body.ownerOrgId && body.ownerOrgId !== user.orgId && !hasPermission(user.role, 'source_documents:manage')) {
-    return Response.json({ error: 'Forbidden owner organization' }, { status: 403 })
-  }
-
-  const rightsStatus =
-    canManageRights(user) && body.rightsStatus
-      ? body.rightsStatus
-      : 'school_owned'
-
-  const [doc] = await db
-    .insert(sourceDocuments)
-    .values({
-      sourceType: body.sourceType,
-      title: body.title,
-      subject: body.subject,
-      grade: body.grade,
-      region: body.region,
-      year: body.year,
-      examName: body.examName,
-      paperType: body.paperType,
-      fileRef: body.fileRef,
-      pageCount: body.pageCount,
-      rightsStatus,
-      ownerOrgId: body.ownerOrgId ?? user.orgId,
-      uploadedBy: body.uploadedBy ?? user.id,
-    })
-    .returning()
-
-  return Response.json(doc, { status: 201 })
+  return Response.json(
+    {
+      error: 'Source documents are derived from question front matter in workspace mode. Edit questions/*.md instead.',
+      projectPath: typeof body.projectPath === 'string' ? resolveProjectPath(body.projectPath) : null,
+    },
+    { status: 405, headers: { Allow: 'GET' } },
+  )
 }

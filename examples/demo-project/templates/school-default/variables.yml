@@ -1,0 +1,12 @@
+papersize: a4
+format:
+  typst:
+    template: templates/school-default/template.typ
+    template-partials:
+      - templates/school-default/typst-template.typ
+      - templates/school-default/typst-show.typ
+    margin:
+      x: 2.2cm
+      y: 2.4cm
+    fontsize: 11pt
+    linestretch: 1.45

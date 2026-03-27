@@ -1,115 +1,62 @@
 import { NextRequest } from 'next/server'
-import { db } from '@/db'
-import { questionItems } from '@/db/schema'
-import { inArray } from 'drizzle-orm'
-import { renderToTypst, resolveTemplatePreset } from '@paperflow/render-typst'
-import type { PaperProject, QuestionItem, OutputMode } from '@paperflow/schema'
+import { renderProjectPdf } from '@/lib/workspace/render'
+import { resolveProjectPath } from '@/lib/workspace/paths'
+import { saveWorkspaceProject } from '@/lib/workspace/project'
 
-/**
- * POST /api/preview — 生成试卷预览 PDF
- *
- * Body: { title, sections, clips, mode }
- * Returns: PDF binary
- */
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const { title, templatePreset = 'default', sections, clips, mode = 'student' } = body
-
-  if (!clips || clips.length === 0) {
-    return Response.json({ error: 'No clips provided' }, { status: 400 })
+  const body = (await request.json()) as {
+    projectPath?: string
+    mode?: 'student' | 'teacher' | 'answer_sheet' | 'solution_book'
+    workspace?: {
+      projectPath?: string
+      title: string
+      subject: string
+      grade: string
+      templatePreset: string
+      mode: 'student' | 'teacher' | 'answer_sheet' | 'solution_book'
+      blueprint?: {
+        intent?: string
+        subject: string
+        grade: string
+        totalScore: number
+        duration?: number
+        sections: Array<{ questionType: string; count: number; scorePerItem: number }>
+        difficultyDistribution?: { easy: number; medium: number; hard: number }
+        knowledgeCoverage?: string[]
+        sourcePreference?: string[]
+        excludedSources?: string[]
+        excludedKnowledge?: string[]
+        regionPreference?: string[]
+        yearRange?: [number, number]
+        parallelVersions?: number
+        outputModes?: Array<'student' | 'teacher' | 'answer_sheet' | 'solution_book'>
+      }
+      sections: Array<{ id: string; title: string; order: number }>
+      clips: Array<{
+        id: string
+        questionId: string
+        sectionId: string
+        order: number
+        score: number
+        locked: boolean
+        hiddenParts: Array<'answer' | 'analysis'>
+        layoutHints?: {
+          keepWithNext?: boolean
+          forcePageBreakBefore?: boolean
+          answerAreaSize?: 's' | 'm' | 'l'
+        }
+      }>
+      questions: Array<{ id: string; sourcePath?: string }>
+    }
   }
 
-  // 从数据库获取题目内容
-  const itemIds: string[] = [...new Set(clips.map((c: { questionItemId: string }) => c.questionItemId) as string[])]
-  const items = await db
-    .select()
-    .from(questionItems)
-    .where(inArray(questionItems.id, itemIds))
-
-  // 构造 PaperProject AST
-  const paper: PaperProject = {
-    id: 'preview',
-    orgId: 'preview',
-    title: title || '预览试卷',
-    blueprint: {
-      subject: '数学',
-      grade: '高一',
-      totalScore: clips.reduce((s: number, c: { score: number }) => s + (c.score || 0), 0),
-      sections: [],
-    },
-    sections: sections || [],
-    clips: clips,
-    templatePreset,
-    outputModes: [mode],
-    version: 1,
-    status: 'draft',
-  }
-
-  // 将数据库行转换为 QuestionItem 格式
-  const questionItemsForRender: QuestionItem[] = items.map((row) => ({
-    id: row.id,
-    canonicalId: row.canonicalId,
-    sourceDocumentId: row.sourceDocumentId ?? '',
-    sourceLocator: (row.sourceLocator as QuestionItem['sourceLocator']) ?? { page: 1 },
-    taxonomy: {
-      subject: row.subject,
-      grade: row.grade,
-      textbookVersion: row.textbookVersion ?? undefined,
-      knowledgeIds: row.knowledgeIds ?? [],
-      abilityTags: row.abilityTags ?? [],
-      questionType: row.questionType as QuestionItem['taxonomy']['questionType'],
-      difficulty: row.difficulty ?? undefined,
-    },
-    content: row.content as QuestionItem['content'],
-    provenance: {
-      examName: row.examName ?? undefined,
-      region: row.region ?? undefined,
-      school: row.school ?? undefined,
-      year: row.year ?? undefined,
-      sourceLabel: row.sourceLabel,
-    },
-    quality: {
-      reviewStatus: row.reviewStatus as QuestionItem['quality']['reviewStatus'],
-      answerVerified: row.answerVerified,
-      duplicateClusterId: row.duplicateClusterId ?? undefined,
-      ocrConfidence: row.ocrConfidence ?? undefined,
-      reviewerId: row.reviewerId ?? undefined,
-    },
-    rightsStatus: row.rightsStatus as QuestionItem['rightsStatus'],
-  }))
-
-  // 渲染 Typst 源码
-  const typstSource = renderToTypst(paper, questionItemsForRender, {
-    mode: mode as OutputMode,
-    template: resolveTemplatePreset(templatePreset),
-  })
-
-  // 调用 compile-typst 服务或直接调用 typst CLI
   try {
-    const { execFile } = await import('node:child_process')
-    const { writeFile, readFile, mkdir, rm } = await import('node:fs/promises')
-    const { join } = await import('node:path')
-    const { randomUUID } = await import('node:crypto')
-    const { tmpdir } = await import('node:os')
+    const projectPath = resolveProjectPath(body.projectPath ?? body.workspace?.projectPath)
+    if (body.workspace) {
+      await saveWorkspaceProject(projectPath, body.workspace)
+    }
 
-    const id = randomUUID()
-    const dir = join(tmpdir(), `paperflow-preview-${id}`)
-    await mkdir(dir, { recursive: true })
-
-    const inputPath = join(dir, 'input.typ')
-    const outputPath = join(dir, 'output.pdf')
-
-    await writeFile(inputPath, typstSource, 'utf-8')
-
-    await new Promise<void>((resolve, reject) => {
-      execFile('typst', ['compile', inputPath, outputPath], (error, _stdout, stderr) => {
-        if (error) reject(new Error(`Typst compile failed: ${stderr || error.message}`))
-        else resolve()
-      })
-    })
-
-    const pdf = await readFile(outputPath)
-    await rm(dir, { recursive: true, force: true })
+    const pdf = await renderProjectPdf(projectPath, body.mode ?? body.workspace?.mode ?? 'student')
 
     return new Response(new Uint8Array(pdf) as unknown as BodyInit, {
       headers: {
@@ -117,8 +64,10 @@ export async function POST(request: NextRequest) {
         'Content-Length': String(pdf.length),
       },
     })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 },
+    )
   }
 }

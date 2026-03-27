@@ -11,6 +11,25 @@ const ROLE_OPTIONS = [
   { value: 'org_admin', label: 'Org Admin' },
 ] as const
 
+const ROLE_CAPABILITIES: Array<{ role: string; abilities: string[] }> = [
+  {
+    role: 'Teacher',
+    abilities: ['查看公共题库', '创建试卷', '导出试卷', '上传来源素材'],
+  },
+  {
+    role: 'Reviewer',
+    abilities: ['Teacher 全部能力', '审核题目', '执行 Review Center 终审'],
+  },
+  {
+    role: 'Librarian',
+    abilities: ['Reviewer 全部能力', '管理版权状态', '导入题包 / JSON / QTI', '维护校本题库'],
+  },
+  {
+    role: 'Org Admin',
+    abilities: ['Librarian 全部能力', '管理组织成员角色', '管理组织配置', '管理正式发布权限'],
+  },
+]
+
 type SessionUser = {
   id: string
   name: string
@@ -192,6 +211,22 @@ export default function AuthPage() {
               <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900/60">
                 <p className="text-xs text-zinc-400">角色</p>
                 <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Teacher、Reviewer、Librarian、Org Admin 权限逐级展开。</p>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">Permission Matrix</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {ROLE_CAPABILITIES.map((entry) => (
+                  <div key={entry.role} className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900/60">
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{entry.role}</p>
+                    <div className="mt-3 space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
+                      {entry.abilities.map((ability) => (
+                        <p key={ability}>{ability}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>

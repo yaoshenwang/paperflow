@@ -1,12 +1,22 @@
 # `apps/web`
 
-This is the Paperflow web workspace.
+This app is the file-first Paperflow workspace UI.
 
-Main routes:
-- `/` project landing page
-- `/studio` paper composition workspace
-- `/review` review center
-- `/auth` lightweight auth and org entry
+Primary routes:
+- `/`
+- `/new`
+- `/editor`
+- `/questions/[id]`
+- `/export`
+
+Primary APIs:
+- `GET /api/workspace`
+- `POST /api/workspace/init`
+- `GET/POST /api/items`
+- `POST /api/preview`
+- `POST /api/export`
+- `POST /api/lint`
+- `POST /api/imports`
 
 Run locally:
 
@@ -17,10 +27,11 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-The best first run is:
-1. Open `/studio`
-2. Click `导入示例数据`
-3. Switch template preset and preview mode
-4. Export PDF / QTI XML / JSON
+Recommended first run:
+1. Open `/new`.
+2. Create a local project directory.
+3. Jump to `/editor`.
+4. Edit `paper.qmd` and `questions/*.md` through the UI.
+5. Validate with `/export`.
 
-For repo-level overview, use the root [`README.md`](../../README.md).
+This app no longer depends on the old Studio/demo import/auth flow as the main path.

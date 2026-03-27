@@ -13,6 +13,7 @@ export type RightsStatus = z.infer<typeof RightsStatusSchema>
 
 /** 审核状态（题目状态机） */
 export const ReviewStatusSchema = z.enum([
+  'raw',
   'draft',
   'parsed',
   'tagged',

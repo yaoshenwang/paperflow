@@ -1,196 +1,163 @@
+import path from 'node:path'
 import { NextRequest } from 'next/server'
-import { db } from '@/db'
-import { questionItems, sourceDocuments } from '@/db/schema'
-import { and, eq, inArray } from 'drizzle-orm'
-import { getCurrentUser, hasPermission } from '@/lib/auth'
-import {
-  buildItemVisibilityCondition,
-  canManageRights,
-  canReviewItems,
-  PUBLIC_REVIEW_STATUSES,
-} from '@/lib/library-access'
+import { deleteQuestion, findQuestion, questionFromMarkdown, readProject, savePaper, saveQuestion } from '@/lib/workspace/project'
+import { resolveProjectPath, slugifyQuestionId, toPosixPath } from '@/lib/workspace/paths'
+import { questionToWorkspaceQuestion } from '@/lib/workspace/view-model'
+import type { QuestionFile } from '@/lib/workspace/types'
 
-/**
- * GET /api/items/:id — 获取题目详情
- */
+function mergeQuestion(existing: QuestionFile, body: Record<string, unknown>) {
+  const nextId = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : existing.id
+  const nextSourceLabel = typeof body.sourceLabel === 'string' ? body.sourceLabel : existing.source.label
+  const nextReview = typeof body.status === 'string'
+    ? body.status
+    : typeof body.review === 'string'
+      ? body.review
+      : existing.review
+  const nextRelativePath = nextId === existing.id
+    ? typeof body.sourcePath === 'string' && body.sourcePath.trim()
+      ? body.sourcePath
+      : existing.relativePath
+    : toPosixPath(path.join('questions', `${slugifyQuestionId(nextId)}.md`))
+
+  return {
+    ...existing,
+    id: nextId,
+    relativePath: nextRelativePath,
+    type: typeof body.type === 'string' ? body.type : existing.type,
+    subject: typeof body.subject === 'string' ? body.subject : existing.subject,
+    grade: typeof body.grade === 'string' ? body.grade : existing.grade,
+    difficulty: typeof body.difficulty === 'number' ? body.difficulty : existing.difficulty,
+    scoreSuggest: typeof body.scoreSuggest === 'number' ? body.scoreSuggest : existing.scoreSuggest,
+    knowledge: Array.isArray(body.knowledge)
+      ? body.knowledge.filter((value): value is string => typeof value === 'string')
+      : existing.knowledge,
+    source: typeof body.source === 'object' && body.source
+      ? {
+          label: typeof (body.source as { label?: unknown }).label === 'string'
+            ? (body.source as { label: string }).label
+            : nextSourceLabel,
+          year: typeof (body.source as { year?: unknown }).year === 'number'
+            ? (body.source as { year: number }).year
+            : existing.source.year,
+          region: typeof (body.source as { region?: unknown }).region === 'string'
+            ? (body.source as { region: string }).region
+            : existing.source.region,
+        }
+      : {
+          ...existing.source,
+          label: nextSourceLabel,
+          year: typeof body.sourceYear === 'number' ? body.sourceYear : existing.source.year,
+          region: typeof body.sourceRegion === 'string' ? body.sourceRegion : existing.source.region,
+          exam: typeof body.sourceExam === 'string' ? body.sourceExam : existing.source.exam,
+        },
+    rights: typeof body.rights === 'string' ? body.rights : existing.rights,
+    review: nextReview,
+    tags: Array.isArray(body.tags)
+      ? body.tags.filter((value): value is string => typeof value === 'string')
+      : existing.tags,
+    layout: typeof body.layout === 'object' && body.layout
+      ? {
+          optionCols: typeof (body.layout as { optionCols?: unknown }).optionCols === 'number'
+            ? (body.layout as { optionCols: number }).optionCols
+            : existing.layout.optionCols,
+          keepWithNext: typeof (body.layout as { keepWithNext?: unknown }).keepWithNext === 'boolean'
+            ? (body.layout as { keepWithNext: boolean }).keepWithNext
+            : existing.layout.keepWithNext,
+          forcePageBreakBefore: typeof (body.layout as { forcePageBreakBefore?: unknown }).forcePageBreakBefore === 'boolean'
+            ? (body.layout as { forcePageBreakBefore: boolean }).forcePageBreakBefore
+            : existing.layout.forcePageBreakBefore,
+        }
+      : existing.layout,
+    stem: typeof body.stem === 'string' ? body.stem : existing.stem,
+    options: Array.isArray(body.options)
+      ? body.options
+          .filter((entry): entry is { label?: unknown; text?: unknown } => !!entry && typeof entry === 'object')
+          .map((entry, index) => ({
+            label: typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : String.fromCharCode(65 + index),
+            text: typeof entry.text === 'string' ? entry.text : '',
+          }))
+      : existing.options,
+    answer: typeof body.answer === 'string' ? body.answer : existing.answer,
+    analysis: typeof body.analysis === 'string' ? body.analysis : existing.analysis,
+  }
+}
+
 export async function GET(
-  _req: NextRequest,
+  request: NextRequest,
   ctx: RouteContext<'/api/items/[id]'>,
 ) {
   const { id } = await ctx.params
-  const user = await getCurrentUser()
-  if (user && !hasPermission(user.role, 'items:read')) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const projectPath = resolveProjectPath(request.nextUrl.searchParams.get('projectPath'))
+  const snapshot = await readProject(projectPath)
+  const question = findQuestion(snapshot, id)
 
-  const conditions = [
-    eq(questionItems.id, id),
-    buildItemVisibilityCondition(user, user?.orgId ? 'all' : 'public'),
-  ]
-
-  if (!canReviewItems(user)) {
-    conditions.push(
-      inArray(questionItems.reviewStatus, [...PUBLIC_REVIEW_STATUSES] as typeof questionItems.reviewStatus.enumValues[number][]),
-    )
-  }
-
-  const [item] = await db
-    .select({ item: questionItems })
-    .from(questionItems)
-    .leftJoin(sourceDocuments, eq(questionItems.sourceDocumentId, sourceDocuments.id))
-    .where(and(...conditions))
-    .limit(1)
-
-  if (!item) {
+  if (!question) {
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
 
-  return Response.json(item.item)
+  const references = snapshot.paper.sections
+    .filter((section) => section.questions.some((entry) => entry.file === question.relativePath))
+    .map((section) => ({
+      sectionId: section.id,
+      title: section.title,
+    }))
+
+  return Response.json({
+    ...questionToWorkspaceQuestion(question),
+    references,
+  })
 }
 
-/** 可更新字段白名单 */
-const UPDATABLE_FIELDS = new Set([
-  'subject', 'grade', 'textbookVersion', 'knowledgeIds', 'abilityTags',
-  'questionType', 'difficulty', 'content', 'examName', 'region', 'school',
-  'year', 'sourceLabel', 'reviewStatus', 'answerVerified', 'rightsStatus',
-])
-
-/**
- * PATCH /api/items/:id — 更新题目
- */
 export async function PATCH(
   request: NextRequest,
   ctx: RouteContext<'/api/items/[id]'>,
 ) {
   const { id } = await ctx.params
-  const user = await getCurrentUser()
-  if (!user) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 })
-  }
-  const canEditItem = hasPermission(user.role, 'items:edit')
-  const canReviewItem = hasPermission(user.role, 'items:review')
-  if (!canEditItem && !canReviewItem) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const body = (await request.json()) as { projectPath?: string } & Record<string, unknown>
+  const projectPath = resolveProjectPath(body.projectPath)
+  const snapshot = await readProject(projectPath)
+  const question = findQuestion(snapshot, id)
 
-  const body = await request.json()
-
-  // 只允许白名单字段更新
-  const updates: Record<string, unknown> = {}
-  for (const key of Object.keys(body)) {
-    if (UPDATABLE_FIELDS.has(key)) {
-      updates[key] = body[key]
-    }
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return Response.json({ error: 'No updatable fields provided' }, { status: 400 })
-  }
-
-  if (!canEditItem) {
-    for (const key of Object.keys(updates)) {
-      if (!['reviewStatus', 'answerVerified'].includes(key)) {
-        delete updates[key]
-      }
-    }
-  }
-
-  if ('reviewStatus' in updates && !canReviewItems(user)) {
-    delete updates.reviewStatus
-  }
-
-  if ('rightsStatus' in updates && !canManageRights(user)) {
-    delete updates.rightsStatus
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return Response.json({ error: 'No permitted fields provided' }, { status: 400 })
-  }
-
-  // 如果 content 被更新，重新计算 searchText
-  if (updates.content) {
-    updates.searchText = extractSearchText(updates.content as Record<string, unknown>)
-  }
-
-  const [existing] = await db
-    .select({ id: questionItems.id })
-    .from(questionItems)
-    .leftJoin(sourceDocuments, eq(questionItems.sourceDocumentId, sourceDocuments.id))
-    .where(and(eq(questionItems.id, id), buildItemVisibilityCondition(user, user.orgId ? 'all' : 'public')))
-    .limit(1)
-
-  if (!existing) {
+  if (!question) {
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const [updated] = await db
-    .update(questionItems)
-    .set({
-      ...updates,
-      updatedAt: new Date(),
-    })
-    .where(eq(questionItems.id, id))
-    .returning()
+  const updated = typeof body.markdown === 'string'
+    ? questionFromMarkdown(
+        projectPath,
+        typeof body.sourcePath === 'string' && body.sourcePath.trim()
+          ? body.sourcePath
+          : question.relativePath,
+        body.markdown,
+      )
+    : mergeQuestion(question, body)
+  const saved = await saveQuestion(projectPath, mergeQuestion(updated, body), question.relativePath)
 
-  if (!updated) {
-    return Response.json({ error: 'Not found' }, { status: 404 })
+  if (question.relativePath !== saved.relativePath) {
+    snapshot.paper.sections = snapshot.paper.sections.map((section) => ({
+      ...section,
+      questions: section.questions.map((entry) =>
+        entry.file === question.relativePath
+          ? { ...entry, file: saved.relativePath }
+          : entry,
+      ),
+    }))
+    await savePaper(projectPath, snapshot.paper)
   }
 
-  return Response.json(updated)
+  return Response.json(questionToWorkspaceQuestion(saved))
 }
 
-/** 从 Block AST 中提取纯文本用于全文搜索 */
-function extractSearchText(content: Record<string, unknown>): string {
-  const texts: string[] = []
-  function walk(node: unknown) {
-    if (!node || typeof node !== 'object') return
-    if (Array.isArray(node)) { node.forEach(walk); return }
-    const obj = node as Record<string, unknown>
-    if (obj.type === 'text' && typeof obj.text === 'string') texts.push(obj.text)
-    if ((obj.type === 'math_inline' || obj.type === 'math_block') && typeof obj.typst === 'string') texts.push(obj.typst)
-    for (const key of ['children', 'stem', 'options', 'answer', 'analysis', 'subquestions', 'content']) {
-      if (obj[key]) walk(obj[key])
-    }
-  }
-  walk(content)
-  return texts.join(' ')
-}
-
-/**
- * DELETE /api/items/:id — 删除题目
- */
 export async function DELETE(
-  _req: NextRequest,
+  request: NextRequest,
   ctx: RouteContext<'/api/items/[id]'>,
 ) {
   const { id } = await ctx.params
-  const user = await getCurrentUser()
-  if (!user) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 })
-  }
-  if (!hasPermission(user.role, 'items:delete')) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const body = request.method === 'DELETE'
+    ? await request.json().catch(() => ({}))
+    : {}
+  const projectPath = resolveProjectPath((body as { projectPath?: string }).projectPath ?? request.nextUrl.searchParams.get('projectPath'))
 
-  const [existing] = await db
-    .select({ id: questionItems.id })
-    .from(questionItems)
-    .leftJoin(sourceDocuments, eq(questionItems.sourceDocumentId, sourceDocuments.id))
-    .where(and(eq(questionItems.id, id), buildItemVisibilityCondition(user, user.orgId ? 'all' : 'public')))
-    .limit(1)
-
-  if (!existing) {
-    return Response.json({ error: 'Not found' }, { status: 404 })
-  }
-
-  const [deleted] = await db
-    .delete(questionItems)
-    .where(eq(questionItems.id, id))
-    .returning({ id: questionItems.id })
-
-  if (!deleted) {
-    return Response.json({ error: 'Not found' }, { status: 404 })
-  }
-
+  await deleteQuestion(projectPath, id)
   return Response.json({ deleted: true })
 }

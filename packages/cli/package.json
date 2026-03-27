@@ -1,0 +1,42 @@
+{
+  "name": "@paperflow/cli",
+  "version": "0.1.0",
+  "description": "Paperflow command line interface",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "bin": {
+    "paperflow": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    },
+    "./pack-artifacts": {
+      "types": "./dist/pack-artifacts.d.ts",
+      "import": "./dist/pack-artifacts.js"
+    },
+    "./zip": {
+      "types": "./dist/zip.d.ts",
+      "import": "./dist/zip.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@paperflow/exam-markdown": "workspace:*",
+    "@paperflow/render-docx": "workspace:*",
+    "@paperflow/render-qti": "workspace:*",
+    "@paperflow/render-typst": "workspace:*",
+    "@paperflow/schema": "workspace:*",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.0"
+  }
+}
