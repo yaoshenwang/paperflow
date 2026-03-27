@@ -194,4 +194,57 @@ describe('project lint', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('accepts answer_area_size defined in question front matter', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'paperflow-exam-markdown-answer-area-'))
+    try {
+      await writePaperFile(
+        join(root, 'paper.qmd'),
+        parsePaperFile([
+          '---',
+          'title: Answer Area Exam',
+          'paperflow:',
+          '  template: school-default',
+          '---',
+          '',
+          '## 一、解答题',
+          '',
+          '{{< question file="questions/q-essay.md" score="12" >}}',
+          '',
+        ].join('\n')),
+      )
+
+      await writeQuestionFile(
+        join(root, 'questions', 'q-essay.md'),
+        parseQuestionFile([
+          '---',
+          'id: q-essay',
+          'type: essay',
+          'subject: math',
+          'grade: high-1',
+          'review: approved',
+          'rights: school_owned',
+          'layout:',
+          '  answer_area_size: l',
+          'source:',
+          '  label: 本地题',
+          '---',
+          '',
+          '::: {.stem}',
+          '证明题。',
+          ':::',
+          '',
+          '::: {.answer}',
+          '略',
+          ':::',
+          '',
+        ].join('\n')),
+      )
+
+      const report = await lintProject(root)
+      expect(report.checks.find((check) => check.id === 'answer_area')?.status).toBe('pass')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

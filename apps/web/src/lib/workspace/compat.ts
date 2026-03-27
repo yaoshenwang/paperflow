@@ -214,6 +214,11 @@ export function projectToLegacyPaper(snapshot: ProjectSnapshot, mode: WorkspaceM
 
     section.questions.forEach((questionRef, questionIndex) => {
       const question = itemByFile.get(questionRef.file)
+      const layoutHints = {
+        keepWithNext: questionRef.layoutHints?.keepWithNext ?? question?.layout.keepWithNext,
+        forcePageBreakBefore: questionRef.layoutHints?.forcePageBreakBefore ?? question?.layout.forcePageBreakBefore,
+        answerAreaSize: questionRef.layoutHints?.answerAreaSize ?? question?.layout.answerAreaSize,
+      }
       clips.push({
         id: `clip-${sectionIndex + 1}-${questionIndex + 1}`,
         questionItemId: question?.id ?? questionRef.file,
@@ -223,13 +228,7 @@ export function projectToLegacyPaper(snapshot: ProjectSnapshot, mode: WorkspaceM
         locked: questionRef.locked,
         hiddenParts: questionRef.hiddenParts,
         altItemIds: [],
-        layoutHints: questionRef.layoutHints ?? (question
-          ? {
-              keepWithNext: question.layout.keepWithNext,
-              forcePageBreakBefore: question.layout.forcePageBreakBefore,
-              answerAreaSize: question.layout.answerAreaSize,
-            }
-          : undefined),
+        layoutHints: Object.values(layoutHints).some((value) => value != null) ? layoutHints : undefined,
       })
     })
   })

@@ -52,6 +52,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [authServiceAvailable, setAuthServiceAvailable] = useState(true)
   const [user, setUser] = useState<SessionUser | null>(null)
   const [members, setMembers] = useState<OrgMember[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
@@ -70,11 +71,15 @@ export default function AuthPage() {
     try {
       const response = await fetch('/api/org/members')
       const data = await response.json()
+      if (response.status === 503) {
+        setAuthServiceAvailable(false)
+      }
       if (!response.ok) {
         setMembers([])
         setMembersMessage(data.error ?? '成员信息读取失败')
         return
       }
+      setAuthServiceAvailable(true)
       setMembers(data.members ?? [])
     } finally {
       setMembersLoading(false)
@@ -83,16 +88,29 @@ export default function AuthPage() {
 
   useEffect(() => {
     const loadMe = async () => {
-      const response = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'me' }),
-      })
-      const data = await response.json()
-      setUser(data.user ?? null)
+      try {
+        const response = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'me' }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          setAuthServiceAvailable(false)
+          setMessage(data.error ?? '认证服务暂不可用')
+          setUser(null)
+          return
+        }
+        setAuthServiceAvailable(data.serviceAvailable !== false)
+        setUser(data.user ?? null)
+      } catch {
+        setAuthServiceAvailable(false)
+        setMessage('认证服务暂不可用')
+        setUser(null)
+      }
     }
 
-    loadMe()
+    void loadMe()
   }, [])
 
   useEffect(() => {
@@ -105,6 +123,7 @@ export default function AuthPage() {
   }, [user?.orgId, user?.role])
 
   const submit = async () => {
+    if (!authServiceAvailable) return
     setLoading(true)
     setMessage(null)
 
@@ -131,10 +150,14 @@ export default function AuthPage() {
 
       const data = await response.json()
       if (!response.ok) {
+        if (response.status === 503) {
+          setAuthServiceAvailable(false)
+        }
         setMessage(data.error ?? '操作失败')
         return
       }
 
+      setAuthServiceAvailable(true)
       router.push('/studio')
       router.refresh()
     } finally {
@@ -164,10 +187,14 @@ export default function AuthPage() {
       const data = await response.json()
 
       if (!response.ok) {
+        if (response.status === 503) {
+          setAuthServiceAvailable(false)
+        }
         setMembersMessage(data.error ?? '成员角色更新失败')
         return
       }
 
+      setAuthServiceAvailable(true)
       setMembers((current) =>
         current.map((member) =>
           member.id === memberId ? { ...member, role: data.member.role } : member,
@@ -232,6 +259,11 @@ export default function AuthPage() {
           </section>
 
           <section className="p-8">
+            {!authServiceAvailable ? (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                PostgreSQL 未就绪，认证与组织成员相关功能已暂时禁用。
+              </div>
+            ) : null}
             {user ? (
               <div className="space-y-6">
                 <div>
@@ -274,7 +306,7 @@ export default function AuthPage() {
                       </div>
                       <button
                         onClick={loadMembers}
-                        disabled={membersLoading}
+                        disabled={membersLoading || !authServiceAvailable}
                         className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
                       >
                         {membersLoading ? '刷新中...' : '刷新成员'}
@@ -299,7 +331,7 @@ export default function AuthPage() {
                             <select
                               value={member.role}
                               onChange={(event) => updateMemberRole(member.id, event.target.value)}
-                              disabled={updatingMemberId === member.id}
+                              disabled={updatingMemberId === member.id || !authServiceAvailable}
                               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                             >
                               {ROLE_OPTIONS.map((option) => (
@@ -395,7 +427,7 @@ export default function AuthPage() {
 
                 <button
                   onClick={submit}
-                  disabled={loading}
+                  disabled={loading || !authServiceAvailable}
                   className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {loading ? '处理中...' : mode === 'login' ? '登录' : '注册并创建会话'}

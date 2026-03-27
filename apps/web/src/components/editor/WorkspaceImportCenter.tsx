@@ -125,6 +125,7 @@ export function WorkspaceImportCenter() {
                   className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-400"
                   placeholder="paperflow-imported-project"
                 />
+                <span className="block text-xs text-zinc-500">相对路径会基于仓库根目录解析，也支持 `~/` 和绝对路径。</span>
               </label>
 
               {currentOption.needsSourcePath ? (

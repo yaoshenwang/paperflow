@@ -64,7 +64,11 @@ export function QuestionDetailEditor() {
               <button
                 onClick={() => {
                   setSavingNotice(null)
-                  void saveQuestion().then(() => setSavingNotice('已保存到题目接口'))
+                  void saveQuestion().then((saved) => {
+                    if (saved) {
+                      setSavingNotice('已保存到题目接口')
+                    }
+                  })
                 }}
                 disabled={questionSaving || !questionDraft}
                 className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -101,7 +105,7 @@ export function QuestionDetailEditor() {
               </div>
 
               <Field label="题目 ID" value={questionDraft?.id ?? questionId} readOnly />
-              <Field label="标题" value={questionDraft?.title ?? ''} onChange={(value) => updateQuestionDraft({ title: value })} />
+              <Field label="标题（题干首行生成）" value={questionDraft?.title ?? ''} readOnly />
               <Field label="学科" value={questionDraft?.subject ?? ''} onChange={(value) => updateQuestionDraft({ subject: value })} />
               <Field label="年级" value={questionDraft?.grade ?? ''} onChange={(value) => updateQuestionDraft({ grade: value })} />
               <Field label="题型" value={questionDraft?.type ?? ''} onChange={(value) => updateQuestionDraft({ type: value })} />

@@ -8,7 +8,7 @@ import {
   type PaperProject,
   type QuestionItem,
 } from '@paperflow/schema'
-import { createProjectScaffold, readProject, saveQuestion, saveWorkspaceProject } from './project'
+import { createProjectScaffold, questionFromMarkdown, readProject, saveQuestion, saveWorkspaceProject } from './project'
 import { resolveProjectFile, slugifyQuestionId, toPosixPath } from './paths'
 import type { QuestionFile, WorkspaceBlueprint, WorkspaceMode } from './types'
 
@@ -17,6 +17,11 @@ type ImportedBundle = {
   items: QuestionItem[]
   mode: WorkspaceMode
   templatePreset: string
+  sourceQuestions?: Array<{
+    id: string
+    relativePath: string
+    source: string
+  }>
 }
 
 type ImportedWorkspaceSummary = {
@@ -159,7 +164,11 @@ function questionTypeToWorkspaceType(type: QuestionItem['taxonomy']['questionTyp
   }
 }
 
-function questionItemToQuestionFile(item: QuestionItem, scoreSuggest: number | null): QuestionFile {
+function questionItemToQuestionFile(
+  item: QuestionItem,
+  scoreSuggest: number | null,
+  layoutHints?: ImportedWorkspaceSummary['clips'][number]['layoutHints'],
+): QuestionFile {
   return {
     id: item.id,
     path: '',
@@ -179,11 +188,12 @@ function questionItemToQuestionFile(item: QuestionItem, scoreSuggest: number | n
     },
     rights: item.rightsStatus,
     review: item.quality.reviewStatus,
-    tags: Array.from(new Set([...item.taxonomy.knowledgeIds, ...item.taxonomy.abilityTags])),
+    tags: Array.from(new Set(item.taxonomy.abilityTags)),
     layout: {
       optionCols: item.content.options && item.content.options.length > 4 ? 1 : 2,
-      keepWithNext: false,
-      forcePageBreakBefore: false,
+      keepWithNext: layoutHints?.keepWithNext ?? false,
+      forcePageBreakBefore: layoutHints?.forcePageBreakBefore ?? false,
+      answerAreaSize: layoutHints?.answerAreaSize,
     },
     stem: blocksToMarkdown(item.content.stem),
     options: item.content.options?.map((option) => ({
@@ -226,6 +236,18 @@ function parseJsonBundle(raw: string): ImportedBundle {
         ? source.templatePreset
         : paper.templatePreset,
     ),
+    sourceQuestions: Array.isArray(payload.sourceQuestions)
+      ? payload.sourceQuestions
+          .filter((entry): entry is { id?: unknown; relativePath?: unknown; source?: unknown } =>
+            !!entry && typeof entry === 'object',
+          )
+          .map((entry) => ({
+            id: typeof entry.id === 'string' ? entry.id : '',
+            relativePath: typeof entry.relativePath === 'string' ? entry.relativePath : '',
+            source: typeof entry.source === 'string' ? entry.source : '',
+          }))
+          .filter((entry) => entry.id && entry.relativePath && entry.source)
+      : undefined,
   }
 }
 
@@ -446,15 +468,27 @@ async function materializeBundle(projectPath: string, bundle: ImportedBundle) {
   })
 
   const suggestedScoreById = new Map<string, number | null>()
+  const layoutHintsById = new Map<string, ImportedWorkspaceSummary['clips'][number]['layoutHints']>()
   summary.clips.forEach((clip) => {
     if (!suggestedScoreById.has(clip.questionId)) {
       suggestedScoreById.set(clip.questionId, clip.score)
     }
+    if (!layoutHintsById.has(clip.questionId) && clip.layoutHints) {
+      layoutHintsById.set(clip.questionId, clip.layoutHints)
+    }
   })
 
   const questionPaths = new Map<string, string>()
+  const sourceQuestionsById = new Map(bundle.sourceQuestions?.map((question) => [question.id, question]) ?? [])
   for (const item of bundle.items) {
-    const file = questionItemToQuestionFile(item, suggestedScoreById.get(item.id) ?? null)
+    const sourceQuestion = sourceQuestionsById.get(item.id)
+    const file = sourceQuestion
+      ? questionFromMarkdown(projectPath, sourceQuestion.relativePath, sourceQuestion.source)
+      : questionItemToQuestionFile(
+          item,
+          suggestedScoreById.get(item.id) ?? null,
+          layoutHintsById.get(item.id),
+        )
     const saved = await saveQuestion(projectPath, file)
     questionPaths.set(item.id, saved.relativePath)
   }

@@ -154,6 +154,16 @@ function frontMatterString(value: unknown, fallback?: string) {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
 
+function normalizeQuestionLayoutHints(layoutHints?: QuestionFile['layout']) {
+  if (!layoutHints) return undefined
+  const next = {
+    keepWithNext: layoutHints.keepWithNext,
+    forcePageBreakBefore: layoutHints.forcePageBreakBefore,
+    answerAreaSize: layoutHints.answerAreaSize,
+  }
+  return Object.values(next).some((value) => value != null) ? next : undefined
+}
+
 function mapQuestion(rootDir: string, relativePath: string, file: ExamQuestionFile): QuestionFile {
   const frontMatter = file.frontMatter
   return {
@@ -225,16 +235,17 @@ function mapPaper(rootDir: string, paper: ExamPaperFile): PaperFile {
       const hiddenParts: Array<'answer' | 'analysis'> = []
       if (attrBoolean(node.attrs, 'hide-answer')) hiddenParts.push('answer')
       if (attrBoolean(node.attrs, 'hide-analysis')) hiddenParts.push('analysis')
+      const layoutHints = normalizeQuestionLayoutHints({
+        keepWithNext: attrBoolean(node.attrs, 'keep-with-next') || undefined,
+        forcePageBreakBefore: attrBoolean(node.attrs, 'force-page-break-before') || undefined,
+        answerAreaSize: attrText(node.attrs, 'answer-area-size') as 's' | 'm' | 'l' | undefined,
+      })
       currentSection!.questions.push({
         file: toPosixPath(node.file),
         score: typeof node.score === 'number' ? node.score : null,
         locked: attrBoolean(node.attrs, 'locked'),
         hiddenParts,
-        layoutHints: {
-          keepWithNext: attrBoolean(node.attrs, 'keep-with-next') || undefined,
-          forcePageBreakBefore: attrBoolean(node.attrs, 'force-page-break-before') || undefined,
-          answerAreaSize: attrText(node.attrs, 'answer-area-size') as 's' | 'm' | 'l' | undefined,
-        },
+        layoutHints,
       })
     }
   }

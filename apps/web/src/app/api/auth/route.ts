@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/db'
 import { users, organizations } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 import { getCurrentUser } from '@/lib/auth'
+import { toApiErrorResponse } from '@/lib/api/errors'
 
 /**
  * POST /api/auth — 简单认证
@@ -15,19 +16,23 @@ import { getCurrentUser } from '@/lib/auth'
  *   me       — 获取当前用户
  */
 export async function POST(request: NextRequest) {
-  const { action, ...params } = await request.json()
+  try {
+    const { action, ...params } = await request.json()
 
-  switch (action) {
-    case 'register':
-      return handleRegister(params)
-    case 'login':
-      return handleLogin(params)
-    case 'logout':
-      return handleLogout()
-    case 'me':
-      return handleMe()
-    default:
-      return Response.json({ error: `Unknown action: ${action}` }, { status: 400 })
+    switch (action) {
+      case 'register':
+        return await handleRegister(params)
+      case 'login':
+        return await handleLogin(params)
+      case 'logout':
+        return await handleLogout()
+      case 'me':
+        return await handleMe()
+      default:
+        return Response.json({ error: `Unknown action: ${action}` }, { status: 400 })
+    }
+  } catch (error) {
+    return toApiErrorResponse(error, '认证服务暂不可用，请先确认 PostgreSQL 已启动。')
   }
 }
 
@@ -116,9 +121,10 @@ async function handleLogout() {
 }
 
 async function handleMe() {
+  await db.execute(sql`select 1`)
   const user = await getCurrentUser()
   if (!user) {
-    return Response.json({ user: null })
+    return Response.json({ user: null, serviceAvailable: true })
   }
 
   return Response.json({
@@ -130,5 +136,6 @@ async function handleMe() {
       orgId: user.orgId,
       orgName: user.orgName,
     },
+    serviceAvailable: true,
   })
 }

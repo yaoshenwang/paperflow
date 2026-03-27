@@ -26,6 +26,8 @@ export type ReviewArtifact = {
   error?: string
 }
 
+const projectRenderLocks = new Map<string, Promise<void>>()
+
 function execFileAsync(file: string, args: string[], cwd?: string, env?: NodeJS.ProcessEnv) {
   return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
     execFile(file, args, { cwd, env, encoding: 'utf8' }, (error, stdout, stderr) => {
@@ -42,6 +44,28 @@ function hasCommand(file: string, args = ['--version']) {
   return execFileAsync(file, args)
     .then(() => true)
     .catch(() => false)
+}
+
+async function withProjectRenderLock<T>(projectPath: string, task: () => Promise<T>) {
+  const key = path.resolve(projectPath)
+  const previous = projectRenderLocks.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const queued = previous.catch(() => undefined).then(() => current)
+  projectRenderLocks.set(key, queued)
+
+  await previous.catch(() => undefined)
+
+  try {
+    return await task()
+  } finally {
+    release()
+    if (projectRenderLocks.get(key) === queued) {
+      projectRenderLocks.delete(key)
+    }
+  }
 }
 
 async function compileTypstToPdf(source: string) {
@@ -86,37 +110,39 @@ async function renderWithQuarto(
   mode: 'student' | 'teacher' | 'solution_book',
   format: 'typst' | 'docx',
 ) {
-  const project = await readExamProject(projectPath)
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const metadataName = `.paperflow-quarto-${id}.yml`
-  const outputName = `.paperflow-quarto-${id}.${format === 'docx' ? 'docx' : 'pdf'}`
-  const inputName = path.basename(project.paperPath)
-  const metadataPath = path.join(projectPath, metadataName)
-  const outputPath = path.join(projectPath, outputName)
-  const metadata = buildQuartoRenderMetadata(project, {
-    mode,
-    template: project.paper.frontMatter.paperflow?.template ?? 'school-default',
-  })
+  return withProjectRenderLock(projectPath, async () => {
+    const project = await readExamProject(projectPath)
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const metadataName = `.paperflow-quarto-${id}.yml`
+    const outputName = `.paperflow-quarto-${id}.${format === 'docx' ? 'docx' : 'pdf'}`
+    const inputName = path.basename(project.paperPath)
+    const metadataPath = path.join(projectPath, metadataName)
+    const outputPath = path.join(projectPath, outputName)
+    const metadata = buildQuartoRenderMetadata(project, {
+      mode,
+      template: project.paper.frontMatter.paperflow?.template ?? 'school-default',
+    })
 
-  await writeFile(metadataPath, YAML.stringify(metadata), 'utf-8')
-  try {
-    await execFileAsync(
-      'quarto',
-      ['render', inputName, '--to', format, '--output', outputName, '--metadata-file', metadataName],
-      projectPath,
-      {
-        ...process.env,
-        PAPERFLOW_MODE: metadata.paperflow.mode,
-        PAPERFLOW_SHOW_SCORE: String(metadata.paperflow.show_score),
-        PAPERFLOW_SHOW_ANSWER: String(metadata.paperflow.show_answer),
-        PAPERFLOW_SHOW_ANALYSIS: String(metadata.paperflow.show_analysis),
-      },
-    )
-    return await readFile(outputPath)
-  } finally {
-    await rm(metadataPath, { force: true })
-    await rm(outputPath, { force: true })
-  }
+    await writeFile(metadataPath, YAML.stringify(metadata), 'utf-8')
+    try {
+      await execFileAsync(
+        'quarto',
+        ['render', inputName, '--to', format, '--output', outputName, '--metadata-file', metadataName],
+        projectPath,
+        {
+          ...process.env,
+          PAPERFLOW_MODE: metadata.paperflow.mode,
+          PAPERFLOW_SHOW_SCORE: String(metadata.paperflow.show_score),
+          PAPERFLOW_SHOW_ANSWER: String(metadata.paperflow.show_answer),
+          PAPERFLOW_SHOW_ANALYSIS: String(metadata.paperflow.show_analysis),
+        },
+      )
+      return await readFile(outputPath)
+    } finally {
+      await rm(metadataPath, { force: true })
+      await rm(outputPath, { force: true })
+    }
+  })
 }
 
 export async function renderProjectTypst(projectPath: string, mode: WorkspaceMode) {
@@ -170,6 +196,13 @@ export async function renderProjectJson(projectPath: string, mode: WorkspaceMode
           templatePreset: snapshot.paper.paperflow.templatePreset,
           templateFolder: snapshot.paper.paperflow.template,
         },
+        sourceQuestions: await Promise.all(
+          snapshot.questions.map(async (question) => ({
+            id: question.id,
+            relativePath: question.relativePath,
+            source: await readFile(question.path, 'utf-8'),
+          })),
+        ),
       },
       null,
       2,

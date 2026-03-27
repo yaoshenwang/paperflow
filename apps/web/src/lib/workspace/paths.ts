@@ -1,4 +1,5 @@
 import { access } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import path from 'node:path'
 
 const repoRoot = path.resolve(process.cwd(), '..', '..')
@@ -11,8 +12,10 @@ export function getDefaultProjectPath() {
 export function resolveProjectPath(input?: string | null) {
   const value = input?.trim()
   if (!value) return path.resolve(getDefaultProjectPath())
+  if (value === '~') return homedir()
+  if (value.startsWith('~/')) return path.join(homedir(), value.slice(2))
   if (path.isAbsolute(value)) return path.normalize(value)
-  return path.resolve(process.cwd(), value)
+  return path.resolve(repoRoot, value)
 }
 
 export function resolveProjectFile(projectPath: string, relativePath: string) {

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { db } from '@/db'
 import { questionItems } from '@/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
+import { toApiErrorResponse } from '@/lib/api/errors'
 
 /**
  * Agent Orchestrator API
@@ -17,21 +18,25 @@ import { eq, and, sql } from 'drizzle-orm'
  *   review_paper      — 审核试卷完整性
  */
 export async function POST(request: NextRequest) {
-  const { action, params } = await request.json()
+  try {
+    const { action, params } = await request.json()
 
-  switch (action) {
-    case 'create_blueprint':
-      return handleCreateBlueprint(params)
-    case 'search_items':
-      return handleSearchItems(params)
-    case 'check_balance':
-      return handleCheckBalance(params)
-    case 'suggest_replace':
-      return handleSuggestReplace(params)
-    case 'review_paper':
-      return handleReviewPaper(params)
-    default:
-      return Response.json({ error: `Unknown action: ${action}` }, { status: 400 })
+    switch (action) {
+      case 'create_blueprint':
+        return await handleCreateBlueprint(params)
+      case 'search_items':
+        return await handleSearchItems(params)
+      case 'check_balance':
+        return await handleCheckBalance(params)
+      case 'suggest_replace':
+        return await handleSuggestReplace(params)
+      case 'review_paper':
+        return await handleReviewPaper(params)
+      default:
+        return Response.json({ error: `Unknown action: ${action}` }, { status: 400 })
+    }
+  } catch (error) {
+    return toApiErrorResponse(error, '题库 Agent 服务暂不可用，请先确认 PostgreSQL 已启动。')
   }
 }
 

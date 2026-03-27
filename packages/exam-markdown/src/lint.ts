@@ -762,7 +762,8 @@ function collectAnswerAreaRisk(paperRefs: PaperRef[], paperQuestions: LintQuesti
     const question = questionByRelative.get(relativePath)?.parsed
     if (!question) return []
     if (!subjectiveTypes.has(question.frontMatter.type)) return []
-    return ref.attrs?.['answer-area-size'] ? [] : [question.frontMatter.id]
+    const answerAreaSize = ref.attrs?.['answer-area-size'] ?? question.frontMatter.layout?.answer_area_size
+    return answerAreaSize ? [] : [question.frontMatter.id]
   })
 }
 
